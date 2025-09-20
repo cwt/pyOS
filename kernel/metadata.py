@@ -7,6 +7,56 @@ from kernel.utils import calc_permission_number
 from kernel.utils import convert_many
 
 
+def get_db_connection():
+    """Get a database connection with type detection."""
+    return sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+
+
+def execute_query(
+    query: str, params: tuple = (), fetch: str = "all"
+) -> Optional[Union[List[Tuple], Tuple]]:
+    """Execute a database query with error handling."""
+    con = get_db_connection()
+    try:
+        with con:
+            cur = con.cursor()
+            cur.execute(query, params)
+            if fetch == "one":
+                result = cur.fetchone()
+            elif fetch == "all":
+                result = cur.fetchall()
+            else:
+                result = None
+            if result:
+                # In Python 3, strings are already Unicode, so no conversion needed
+                if isinstance(result, list):
+                    result = [
+                        tuple(
+                            str(x) if isinstance(x, bytes) else x for x in row
+                        )
+                        for row in result
+                    ]
+                elif isinstance(result, tuple):
+                    result = tuple(
+                        str(x) if isinstance(x, bytes) else x for x in result
+                    )
+            return result
+    except Exception:
+        return None
+
+
+def execute_many(query: str, params_list: List[tuple]) -> bool:
+    """Execute a database query with multiple parameter sets."""
+    con = get_db_connection()
+    try:
+        with con:
+            cur = con.cursor()
+            cur.executemany(query, params_list)
+        return True
+    except Exception:
+        return False
+
+
 def build_meta_data_database(fsmatches: List[str]) -> None:
     now = datetime.datetime.now()
 
@@ -20,7 +70,7 @@ def build_meta_data_database(fsmatches: List[str]) -> None:
                     accessed TIMESTAMP,
                     modified TIMESTAMP)"""
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     try:
         with con:
             cur = con.cursor()
@@ -43,33 +93,16 @@ def build_meta_data_database(fsmatches: List[str]) -> None:
 
 
 def get_meta_data(path: str) -> Optional[Tuple]:
-    data = None
-
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.execute("SELECT * FROM metadata WHERE path = ?", (path,))
-        data = cur.fetchone()
-        if data:
-            # In Python 3, strings are already Unicode, so no conversion needed
-            data = tuple(str(x) if isinstance(x, bytes) else x for x in data)
+    data = execute_query(
+        "SELECT * FROM metadata WHERE path = ?", (path,), "one"
+    )
     return data
 
 
 def get_all_meta_data(path: str = "/") -> Optional[List[Tuple]]:
-    data = None
-
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.execute("SELECT * FROM metadata WHERE path LIKE ?", (path + "%",))
-        data = cur.fetchall()
-        if data:
-            # In Python 3, strings are already Unicode, so no conversion needed
-            data = [
-                tuple(str(x) if isinstance(x, bytes) else x for x in row)
-                for row in data
-            ]
+    data = execute_query(
+        "SELECT * FROM metadata WHERE path LIKE ?", (path + "%",), "all"
+    )
     return data
 
 
@@ -83,10 +116,7 @@ def add_path(path: str, owner: str, permission: str) -> None:
 
     addsql = "INSERT INTO metadata VALUES (?, ?, ?, ?, ?, ?)"
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.executemany(addsql, data)
+    execute_many(addsql, data)
 
 
 def copy_path(src: str, dst: str) -> None:
@@ -99,7 +129,7 @@ def copy_path(src: str, dst: str) -> None:
     selsql = "SELECT owner,permission FROM metadata WHERE path = ?"
     addsql = "INSERT INTO metadata VALUES (?, ?, ?, ?, ?, ?)"
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         temp = []
@@ -127,7 +157,7 @@ def move_path(src: str, dst: str) -> None:
 
     data = [(x, now, y) for ((x,), (y,)) in zip(dst_converted, src_converted)]
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.executemany(
@@ -139,10 +169,7 @@ def delete_path(path: str) -> None:
     path_converted = convert_many(path)
     delsql = "DELETE FROM metadata WHERE path = ?"
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.executemany(delsql, path_converted)
+    execute_many(delsql, path_converted)
 
 
 def validate_permission(value: str) -> None:
@@ -170,7 +197,7 @@ def set_permission_number(path: str, value: str) -> None:
 
     validate_permission(value)
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(
@@ -200,7 +227,7 @@ def set_time(
 
 
 def set_time_list(path: str, value: Union[tuple, list]) -> None:
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     columns = ["accessed", "created", "modified"]
 
     a = [x + " = ?" for (x, y) in zip(columns, value) if y is not None]
@@ -293,7 +320,7 @@ def set_owner(path: str, owner: str) -> None:
 
     value = validate_owner(owner)
 
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(

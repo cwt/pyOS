@@ -1,10 +1,11 @@
 from typing import Any, List
+from kernel.io_utils import write_output
 
 
 def run(shell: Any, args: List[str]) -> None:
-    shell.stdout.write(" ".join(args))
+    write_output(shell, " ".join(args))
     if not shell.stdout:
-        shell.stdout.write("")
+        write_output(shell, "")
 
 
 def help() -> str:

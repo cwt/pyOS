@@ -1,5 +1,10 @@
 from kernel.utils import Parser
 from typing import Any, List
+from kernel.common import (
+    resolve_path,
+    handle_file_operation,
+    copy_file_metadata,
+)
 
 
 desc = "Copies the given file/directory to the given location."
@@ -20,11 +25,11 @@ def run(shell: Any, args: List[str]) -> None:
     args = parser.parse_args(args)
     if not parser.help:
         if len(args.paths) >= 2:
-            dest = shell.sabs_path(args.paths[-1])
+            dest = resolve_path(shell, args.paths[-1])
             if (
-                shell.syscall.is_dir(dest)
+                handle_file_operation(shell, dest, "is_dir")
                 or len(args.paths) == 2
-                or not shell.syscall.exists(dest)
+                or not handle_file_operation(shell, dest, "exists")
             ):
                 for src in args.paths[:-1]:
                     copy(shell, args, src, dest)
@@ -35,14 +40,24 @@ def run(shell: Any, args: List[str]) -> None:
 
 
 def copy(shell: Any, args: Any, src: str, dest: str) -> None:
-    src = shell.sabs_path(src)
+    src = resolve_path(shell, src)
 
-    if args.recursive and shell.syscall.is_dir(src):
-        srcpaths = shell.syscall.list_all(src)
+    if args.recursive and handle_file_operation(shell, src, "is_dir"):
+        # This would need to be implemented in the common module if used frequently
+        srcpaths = []
+
+        def collect_paths(current_path):
+            srcpaths.append(current_path)
+            if handle_file_operation(shell, current_path, "is_dir"):
+                for item in shell.syscall.list_dir(current_path):
+                    item_path = shell.syscall.join_path(current_path, item)
+                    collect_paths(item_path)
+
+        collect_paths(src)
     else:
         srcpaths = [src]
 
-    if shell.syscall.is_dir(dest):
+    if handle_file_operation(shell, dest, "is_dir"):
         join = [dest, shell.syscall.base_name(src)]
         destbase = shell.syscall.join_path(*join)
     else:
@@ -59,24 +74,20 @@ def copy(shell: Any, args: Any, src: str, dest: str) -> None:
             shell.stdout.write("Copying %s to %s" % (path, destpath))
 
         try:
-            if shell.syscall.is_dir(path):
+            if handle_file_operation(shell, path, "is_dir"):
                 if args.recursive:
                     copy_dir(shell, path, destpath)
                 else:
                     shell.stdout.write("omitting directory: %s" % path)
             else:
-                shell.syscall.copy(path, destpath)
+                handle_file_operation(shell, path, "copy", destpath)
         except OSError:
             shell.stderr.write("file error " + destpath)
 
 
 def copy_dir(shell: Any, src: str, dest: str) -> None:
-    shell.syscall.make_dir(dest)
-    # TODO # add copy metedata to syscalls?
-    meta = shell.syscall.get_meta_data(src)
-    shell.syscall.set_owner(dest, meta[1])
-    shell.syscall.set_permission(dest, meta[2])
-    shell.syscall.set_time(dest, meta[3:6])
+    handle_file_operation(shell, dest, "make_dir")
+    copy_file_metadata(shell, src, dest)
 
 
 def help() -> str:

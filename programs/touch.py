@@ -2,6 +2,8 @@ import datetime
 from typing import Any, List, Optional
 
 from kernel.utils import Parser
+from kernel.common import resolve_path, handle_file_operation
+from kernel.io_utils import write_error
 
 
 desc = "Creates an empty file at the given path."
@@ -24,19 +26,21 @@ def run(shell: Any, args: List[str]) -> None:
         timestuff = any([args.date, args.timestamp])
         if args.paths:
             if args.date and args.timestamp:
-                shell.stderr.write(
-                    "cannot specify times from more than one source"
+                write_error(
+                    shell, "cannot specify times from more than one source"
                 )
             else:
                 times = get_times(args)
                 for x in args.paths:
-                    path = shell.sabs_path(x)
-                    if not shell.syscall.is_dir(path):
-                        shell.syscall.open_file(path, "a").close()
+                    path = resolve_path(shell, x)
+                    if not handle_file_operation(shell, path, "is_dir"):
+                        f = handle_file_operation(shell, path, "open", "a")
+                        if f:
+                            f.close()
                     if timestuff:
                         shell.syscall.set_time(path, times)
         else:
-            shell.stderr.write("missing file operand")
+            write_error(shell, "missing file operand")
 
 
 def get_times(args: Any) -> List[Optional[datetime.datetime]]:

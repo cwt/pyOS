@@ -1,5 +1,6 @@
 from kernel.utils import Parser
 from typing import Any, List
+from kernel.common import resolve_path, handle_file_operation
 
 
 desc = "Removes the file/directory."
@@ -27,11 +28,20 @@ def run(shell: Any, args: List[str]) -> None:
 
 
 def remove(shell: Any, args: Any, path: str) -> None:
-    path = shell.sabs_path(path)
+    path = resolve_path(shell, path)
 
-    if shell.syscall.is_dir(path):
+    if handle_file_operation(shell, path, "is_dir"):
         if args.recursive:
-            paths = shell.syscall.list_all(path)
+            paths = []
+
+            def collect_paths(current_path):
+                paths.append(current_path)
+                if handle_file_operation(shell, current_path, "is_dir"):
+                    for item in shell.syscall.list_dir(current_path):
+                        item_path = shell.syscall.join_path(current_path, item)
+                        collect_paths(item_path)
+
+            collect_paths(path)
         else:
             shell.stderr.write("%s is a directory" % (path,))
             return
@@ -42,10 +52,10 @@ def remove(shell: Any, args: Any, path: str) -> None:
         if args.verbose:
             shell.stdout.write("Removing %s" % (p,))
         try:
-            if shell.syscall.is_dir(p):
-                shell.syscall.remove_dir(p)
+            if handle_file_operation(shell, p, "is_dir"):
+                handle_file_operation(shell, p, "remove_dir")
             else:
-                shell.syscall.remove(p)
+                handle_file_operation(shell, p, "remove")
         except OSError:
             shell.stderr.write("%s does not exist" % (p,))
 

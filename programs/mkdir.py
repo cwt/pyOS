@@ -1,5 +1,7 @@
 from kernel.utils import Parser
 from typing import Any, List
+from kernel.common import resolve_path, handle_file_operation
+from kernel.io_utils import write_output, write_error
 
 
 desc = "Creates a directory at the given path."
@@ -22,32 +24,32 @@ def run(shell: Any, args: List[str]) -> None:
             for path in args.paths:
                 make_dir(shell, args, path)
         else:
-            shell.stderr.write("missing directory operand")
+            write_error(shell, "missing directory operand")
 
 
 def make_dir(shell: Any, args: Any, path: str) -> None:
-    path = shell.sabs_path(path)
-    if not shell.syscall.exists(path):
+    path = resolve_path(shell, path)
+    if not handle_file_operation(shell, path, "exists"):
         paths = []
         if args.parent:
             while True:
                 paths.append(path)
                 path = shell.syscall.dir_name(path)
-                if shell.syscall.is_dir(path):
+                if handle_file_operation(shell, path, "is_dir"):
                     break
         else:
             paths.append(path)
         for x in reversed(paths):
             if args.verbose:
-                shell.stdout.write("Making directory: %s" % (path,))
+                write_output(shell, "Making directory: %s" % (path,))
             try:
-                shell.syscall.make_dir(x)
+                handle_file_operation(shell, x, "make_dir")
             except IOError:
-                shell.stderr.write("could not make directory %s" % (path,))
+                write_error(shell, "could not make directory %s" % (path,))
                 break
                 # TODO # delete on fail?
     else:
-        shell.stderr.write("%s already exists" % (path,))
+        write_error(shell, "%s already exists" % (path,))
 
 
 def help() -> str:

@@ -1,8 +1,9 @@
 from typing import Any, List
+from kernel.io_utils import write_output
 
 
 def run(shell: Any, args: List[str]) -> None:
-    shell.stdout.write(shell.get_path())
+    write_output(shell, shell.get_path())
 
 
 def help() -> str:

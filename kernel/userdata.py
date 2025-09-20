@@ -1,8 +1,7 @@
-import sqlite3
 from typing import Optional, List, Tuple, Any
 
-from kernel.constants import USERDATAFILE
 from kernel.utils import convert_many
+from kernel.metadata import get_db_connection, execute_query, execute_many
 
 
 def build_user_data_database() -> None:
@@ -15,7 +14,7 @@ def build_user_data_database() -> None:
                     shell TEXT,
                     password TEXT)"""
 
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     root = (
         "root",
         "root",
@@ -42,33 +41,14 @@ def build_user_data_database() -> None:
 
 
 def get_user_data(user: str) -> Optional[Tuple]:
-    data = None
-
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.execute("SELECT * FROM userdata WHERE username = ?", (user,))
-        data = cur.fetchone()
-        if data:
-            # In Python 3, strings are already Unicode, so no conversion needed
-            data = tuple(str(x) if isinstance(x, bytes) else x for x in data)
+    data = execute_query(
+        "SELECT * FROM userdata WHERE username = ?", (user,), "one"
+    )
     return data
 
 
 def get_all_user_data() -> Optional[List[Tuple]]:
-    data = None
-
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.execute("SELECT * FROM userdata")
-        data = cur.fetchall()
-        if data:
-            # In Python 3, strings are already Unicode, so no conversion needed
-            data = [
-                tuple(str(x) if isinstance(x, bytes) else x for x in row)
-                for row in data
-            ]
+    data = execute_query("SELECT * FROM userdata", (), "all")
     return data
 
 
@@ -80,20 +60,14 @@ def add_user(
 ) -> None:
     addsql = "INSERT INTO userdata VALUES (?, ?, ?, ?, ?, ?)"
 
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.execute(addsql, (user, group, info, homedir, shell, password))
+    execute_many(addsql, [(user, group, info, homedir, shell, password)])
 
 
 def delete_user(user: str) -> None:
     user_converted = convert_many(user)
     delsql = "DELETE FROM userdata WHERE username = ?"
 
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    with con:
-        cur = con.cursor()
-        cur.executemany(delsql, user_converted)
+    execute_many(delsql, user_converted)
 
 
 def change_user(user: str, value: Any) -> None:
@@ -108,7 +82,7 @@ def get_group(user: str) -> str:
 
 
 def set_group(user: str, value: str) -> None:
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(
@@ -122,7 +96,7 @@ def get_info(user: str) -> str:
 
 
 def set_info(user: str, value: str) -> None:
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(
@@ -135,7 +109,7 @@ def get_homedir(user: str) -> str:
 
 
 def set_homedir(user: str, value: str) -> None:
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(
@@ -148,7 +122,7 @@ def get_shell(user: str) -> str:
 
 
 def set_shell(user: str, value: str) -> None:
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(
@@ -161,7 +135,7 @@ def get_password(user: str) -> str:
 
 
 def set_password(user: str, value: str) -> None:
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    con = get_db_connection()
     with con:
         cur = con.cursor()
         cur.execute(

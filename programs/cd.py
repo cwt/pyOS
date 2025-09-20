@@ -1,15 +1,17 @@
 from typing import Any, List
+from kernel.common import resolve_path, handle_file_operation
+from kernel.io_utils import write_error
 
 
 def run(shell: Any, args: List[str]) -> None:
     # hack to fix encapsulation
     shell = shell.parent
     if args:
-        path = shell.sabs_path(args[0])
-        if shell.syscall.is_dir(path):
+        path = resolve_path(shell, args[0])
+        if handle_file_operation(shell, path, "is_dir"):
             shell.set_path(path)
         else:
-            shell.stderr.write("%s: no such directory" % (path,))
+            write_error(shell, "%s: no such directory" % (path,))
 
 
 def help() -> str:

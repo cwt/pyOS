@@ -1,9 +1,10 @@
 from typing import Any, List
+from kernel.common import resolve_path, handle_file_operation, process_stdin
 
 
 def run(shell: Any, args: List[str]) -> None:
     if args:
-        path = shell.sabs_path(args[0])
+        path = resolve_path(shell, args[0])
         try:
             if args[1] in ("a", "w"):
                 mode = args[1]
@@ -11,13 +12,14 @@ def run(shell: Any, args: List[str]) -> None:
                 shell.stderr.write("%s is not a valid file mode" % (args[1]))
         except IndexError:
             mode = "w"
-        try:
-            f = shell.syscall.open_file(path, mode)
-            for line in shell.stdin.read():
+        f = handle_file_operation(shell, path, "open", mode)
+        if f:
+
+            def write_line(line):
                 f.write("%s\n" % (line,))
+
+            process_stdin(shell, write_line)
             f.close()
-        except Exception:
-            shell.stderr.write("file error")
     else:
         shell.stderr.write("missing file operand")
 

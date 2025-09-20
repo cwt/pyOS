@@ -1,4 +1,6 @@
 from kernel.utils import Parser
+from kernel.common import resolve_path
+from kernel.file_utils import read_file_lines
 
 desc = "Returns the last n lines of a file."
 parser = Parser("tail", name="Tail", description=desc)
@@ -16,21 +18,22 @@ def run(shell, args):
     args = parser.parse_args(args)
     if not parser.help:
         for x in args.paths:
-            path = shell.sabs_path(x)
-            if args.paths > 1 or shell.stdin:
+            path = resolve_path(shell, x)
+            if len(args.paths) > 1 or shell.stdin:
                 shell.stdout.write("==> %s <==" % (x,))
-            try:
-                f = shell.syscall.open_file(path, "r")
-                for line in f.readlines()[-args.lineamount :]:
-                    shell.stdout.write(line.rstrip())
-                f.close()
-            except IOError:
-                shell.stderr.write("%s does not exist" % (path,))
+            lines = read_file_lines(shell, path)
+            for line in lines[-args.lineamount :]:
+                shell.stdout.write(line.rstrip())
         shell.stdout.write("")
         if shell.stdin:
             if args.paths:
                 shell.stdout.write("==> %% stdin %% <==")
-            for line in shell.stdin.readlines()[-args.lineamount :]:
+            stdin_lines = []
+            try:
+                stdin_lines = list(shell.stdin.readlines())
+            except Exception:
+                pass
+            for line in stdin_lines[-args.lineamount :]:
                 shell.stdout.write(line)
             shell.stdout.write("")
         else:

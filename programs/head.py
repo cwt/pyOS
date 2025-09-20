@@ -1,4 +1,6 @@
 from kernel.utils import Parser
+from kernel.common import resolve_path
+from kernel.file_utils import read_file_lines
 
 desc = "Returns the first n lines of a file."
 parser = Parser("head", name="Head", description=desc)
@@ -16,21 +18,22 @@ def run(shell, args):
     args = parser.parse_args(args)
     if not parser.help:
         for x in args.paths:
-            path = shell.sabs_path(x)
-            if args.paths > 1 or shell.stdin:
+            path = resolve_path(shell, x)
+            if len(args.paths) > 1 or shell.stdin:
                 shell.stdout.write("==> %s <==" % (x,))
-            try:
-                f = shell.syscall.open_file(path, "r")
-                for x in range(args.lineamount):
-                    shell.stdout.write(f.readline().rstrip())
-                f.close()
-            except IOError:
-                shell.stderr.write("%s does not exist" % (path))
+            lines = read_file_lines(shell, path)
+            for line in lines[: args.lineamount]:
+                shell.stdout.write(line.rstrip())
         if shell.stdin:
             if args.paths:
                 shell.stdout.write("==> %% stdin %% <==")
-            for x in range(args.lineamount):
-                shell.stdout.write(shell.stdin.readline())
+            stdin_lines = []
+            try:
+                stdin_lines = list(shell.stdin.read())
+            except Exception:
+                pass
+            for line in stdin_lines[: args.lineamount]:
+                shell.stdout.write(line)
             shell.stdout.write("")
         else:
             if not args.paths:

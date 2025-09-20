@@ -1,6 +1,8 @@
 import re
 
 from kernel.utils import Parser
+from kernel.common import resolve_path, handle_file_operation
+from kernel.file_utils import read_file_lines
 
 desc = "Search for lines in a file matching the pattern given."
 parser = Parser("grep", name="Grep", description=desc)
@@ -45,17 +47,16 @@ def run(shell, args):
 
 
 def grep(shell, args, pattern, path):
-    newpath = shell.sabs_path(path)
-    if shell.syscall.is_file(path):
-        f = shell.syscall.open_file(newpath, "r")
-        for line in f:
+    newpath = resolve_path(shell, path)
+    if handle_file_operation(shell, newpath, "is_file"):
+        lines = read_file_lines(shell, newpath)
+        for line in lines:
             # use xor to invert the selection
             if bool(re.findall(pattern, line)) ^ args.invert:
                 if shell.stdout:
                     shell.stdout.write(line.rstrip())
                 else:
                     shell.stdout.write("%s:%s" % (path, line.rstrip()))
-        f.close()
     else:
         shell.stderr.write("%s does not exist" % (newpath,))
 

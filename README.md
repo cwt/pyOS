@@ -17,6 +17,16 @@ Features
 - basic system call structure
 - file/directory permissions
 - basic user system
+- DRY code principles with utility modules for common operations
+
+Utility Modules
+---------------
+- `kernel.common` - Common utility functions for file operations and error handling
+- `kernel.file_utils` - File operation utilities for reading, writing, and processing files
+- `kernel.io_utils` - Standard input/output utilities for consistent I/O operations
+- `kernel.path_utils` - Path manipulation utilities for handling file paths
+- `kernel.metadata` - Enhanced database operations for file metadata
+- `kernel.userdata` - Enhanced database operations for user data
 
 Todo
 ----
