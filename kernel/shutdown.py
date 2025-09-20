@@ -1,2 +1,2 @@
-def run():
-    print "SHUTTING DOWN"
+def run() -> None:
+    print("SHUTTING DOWN")

@@ -3,13 +3,18 @@ import re
 from kernel.utils import Parser
 
 desc = "Search for lines in a file matching the pattern given."
-parser = Parser('grep', name="Grep", description=desc)
+parser = Parser("grep", name="Grep", description=desc)
 pa = parser.add_argument
-pa('paths', type=str, nargs='*',)
-pa('-e', action="store", type=str, dest="pattern", default='')
-pa('-a', action="store_true", dest="all", default=False)
-pa('-i', action="store_true", dest="ignorecase", default=False)
-pa('-v', action="store_true", dest="invert", default=False)
+pa(
+    "paths",
+    type=str,
+    nargs="*",
+)
+pa("-e", action="store", type=str, dest="pattern", default="")
+pa("-a", action="store_true", dest="all", default=False)
+pa("-i", action="store_true", dest="ignorecase", default=False)
+pa("-v", action="store_true", dest="invert", default=False)
+
 
 def run(shell, args):
     parser.add_shell(shell)
@@ -34,14 +39,15 @@ def run(shell, args):
                     if bool(re.findall(pattern, line)) ^ args.invert:
                         shell.stdout.write(line.strip())
             if not shell.stdout:
-                shell.stdout.write('')
+                shell.stdout.write("")
         else:
             shell.stderr.write("missing file operand")
+
 
 def grep(shell, args, pattern, path):
     newpath = shell.sabs_path(path)
     if shell.syscall.is_file(path):
-        f = shell.syscall.open_file(newpath, 'r')
+        f = shell.syscall.open_file(newpath, "r")
         for line in f:
             # use xor to invert the selection
             if bool(re.findall(pattern, line)) ^ args.invert:
@@ -51,7 +57,8 @@ def grep(shell, args, pattern, path):
                     shell.stdout.write("%s:%s" % (path, line.rstrip()))
         f.close()
     else:
-        shell.stderr.write("%s does not exist" % (newpath, ))
+        shell.stderr.write("%s does not exist" % (newpath,))
+
 
 def help():
     return parser.help_msg()

@@ -1,10 +1,12 @@
 import time
 import random
 
+
 def run(shell, args):
-    for x in xrange(20):
+    for x in range(20):
         shell.stdout.write(str(x))
-        time.sleep(1*random.random())
+        time.sleep(1 * random.random())
+
 
 def help():
-    return ''
+    return ""

@@ -5,33 +5,37 @@ import datetime
 from kernel.utils import Parser
 
 desc = "Finds files matching the expression given."
-parser = Parser('find', name="Find", description=desc)
+parser = Parser("find", name="Find", description=desc)
 pa = parser.add_argument
-pa('paths', type=str, nargs='*',)
+pa(
+    "paths",
+    type=str,
+    nargs="*",
+)
 
-pa('-time', action="store", type=str, nargs='*', dest="time", default=None)
-pa('-newer', action="store", type=str, nargs='*', dest="newer", default=None)
+pa("-time", action="store", type=str, nargs="*", dest="time", default=None)
+pa("-newer", action="store", type=str, nargs="*", dest="newer", default=None)
 
-pa('-perm', action="store", type=str, nargs='*', dest="perm", default=None)
-pa('-readable', action="store_true", dest="readable", default=False)
-pa('-writable', action="store_true", dest="writable", default=False)
-pa('-executable', action="store_true", dest="executable", default=False)
+pa("-perm", action="store", type=str, nargs="*", dest="perm", default=None)
+pa("-readable", action="store_true", dest="readable", default=False)
+pa("-writable", action="store_true", dest="writable", default=False)
+pa("-executable", action="store_true", dest="executable", default=False)
 
-pa('-exp', action="store", type=str, dest="expression", default=None)
+pa("-exp", action="store", type=str, dest="expression", default=None)
 
-pa('-depth', action="store_true", dest="depth", default=False)
-pa('-maxdepth', action="store", type=int, dest="maxdepth", default=None)
-pa('-mindepth', action="store", type=int, dest="mindepth", default=None)
+pa("-depth", action="store_true", dest="depth", default=False)
+pa("-maxdepth", action="store", type=int, dest="maxdepth", default=None)
+pa("-mindepth", action="store", type=int, dest="mindepth", default=None)
 
-pa('-empty', action="store_true", dest="empty", default=False)
+pa("-empty", action="store_true", dest="empty", default=False)
 
-pa('-uid', action="store", type=int, nargs='*', dest="uid", default=None)
-pa('-user', action="store", type=str, nargs='*', dest="user", default=None)
-pa('-nouser', action="store_true", dest="nouser", default=False)
+pa("-uid", action="store", type=int, nargs="*", dest="uid", default=None)
+pa("-user", action="store", type=str, nargs="*", dest="user", default=None)
+pa("-nouser", action="store_true", dest="nouser", default=False)
 
-pa('-gid', action="store", type=int, nargs='*', dest="gid", default=None)
-pa('-group', action="store", type=str, nargs='*', dest="group", default=None)
-pa('-nogroup', action="store_true", dest="nogroup", default=False)
+pa("-gid", action="store", type=int, nargs="*", dest="gid", default=None)
+pa("-group", action="store", type=str, nargs="*", dest="group", default=None)
+pa("-nogroup", action="store_true", dest="nogroup", default=False)
 
 # -empty
 # -false
@@ -54,6 +58,7 @@ pa('-nogroup', action="store_true", dest="nogroup", default=False)
 # -type [bcdpflsD]
 # -xtype [bcdpfls]
 
+
 def run(shell, args):
     parser.add_shell(shell)
     args = parser.parse_args(args)
@@ -61,7 +66,7 @@ def run(shell, args):
         if args.paths:
             paths = args.paths
         else:
-            paths = ['/']
+            paths = ["/"]
         now = datetime.datetime.now()
         perms = convert_permissions(shell, args)
         times = convert_time(args, now)
@@ -70,19 +75,16 @@ def run(shell, args):
             for x in a:
                 shell.stdout.write(x)
         if not shell.stdout:
-            shell.stdout.write('')
+            shell.stdout.write("")
+
 
 def find(shell, args, basepath, perms, times):
     done = []
     access, modify, create = times
     get_data = shell.syscall.get_all_meta_data
-    for (path, uid, perm, created, accessed, modified) in get_data(basepath):
-        mtimes = {
-            'a': accessed,
-            'm': modified,
-            'c': created
-        }
-        plen = len([x for x in path.split('/') if x])
+    for path, uid, perm, created, accessed, modified in get_data(basepath):
+        mtimes = {"a": accessed, "m": modified, "c": created}
+        plen = len([x for x in path.split("/") if x])
         if args.expression:
             if not fnmatch.fnmatchcase(path, args.expression):
                 continue
@@ -113,19 +115,15 @@ def find(shell, args, basepath, perms, times):
 
 
 def convert_time(args, now):
-    d = {
-        'a': [None, None],
-        'm': [None, None],
-        'c': [None, None]
-        }
+    d = {"a": [None, None], "m": [None, None], "c": [None, None]}
 
     timeinc = {
-        'w':'weeks',
-        'd': 'days',
-        'h':'hours',
-        'm':'minutes',
-        's':'seconds'
-        }
+        "w": "weeks",
+        "d": "days",
+        "h": "hours",
+        "m": "minutes",
+        "s": "seconds",
+    }
 
     # this is used to fix leap years
     year = 365.2425
@@ -136,15 +134,15 @@ def convert_time(args, now):
             other = float(time[2:-1])
             unit = time[-1]
 
-            if unit == 'y':
-                unit = 'd'
+            if unit == "y":
+                unit = "d"
                 other *= year
             t = datetime.timedelta(**{timeinc[unit]: other})
 
-            if op == '+':
+            if op == "+":
                 if not d[lvl][0] or t > d[lvl][0]:
                     d[lvl][0] = t
-            elif op == '-':
+            elif op == "-":
                 if not d[lvl][0] or t < d[lvl][1]:
                     d[lvl][1] = t
     for key in d:
@@ -153,31 +151,34 @@ def convert_time(args, now):
 
 
 def convert_permissions(shell, args):
-    d = {
-        'u': list('...'),
-        'g': list('...'),
-        'o': list('...')
-        }
+    d = {"u": list("..."), "g": list("..."), "o": list("...")}
     perm = None
     if args.perm:
         try:
             int(args.perm[0])
             perm = [shell.syscall.calc_permission_string(args.perm[0])]
-        except:
-            for permset in ','.join(args.perm).split(','):
+        except Exception:
+            for permset in ",".join(args.perm).split(","):
                 lvl = permset[0]
                 op = permset[1]
                 perm = permset[2:]
 
-                if op == '=':
-                    d[lvl] = [x if x in perm else '-' for x in 'rwx']
-                elif op == '-':
-                    d[lvl] = ['-' if x in perm else d[lvl][i] for i,x in enumerate('rwx')]
-                elif op == '+':
-                    d[lvl] = [x if x in perm else d[lvl][i] for i,x in enumerate('rwx')]
-            perm = ''.join([''.join(d[key]) for key in 'ugo'])
+                if op == "=":
+                    d[lvl] = [x if x in perm else "-" for x in "rwx"]
+                elif op == "-":
+                    d[lvl] = [
+                        "-" if x in perm else d[lvl][i]
+                        for i, x in enumerate("rwx")
+                    ]
+                elif op == "+":
+                    d[lvl] = [
+                        x if x in perm else d[lvl][i]
+                        for i, x in enumerate("rwx")
+                    ]
+            perm = "".join(["".join(d[key]) for key in "ugo"])
 
     return perm
+
 
 def help():
     return parser.help_msg()

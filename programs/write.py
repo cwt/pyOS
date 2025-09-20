@@ -1,4 +1,7 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     if args:
         path = shell.sabs_path(args[0])
         try:
@@ -7,18 +10,19 @@ def run(shell, args):
             else:
                 shell.stderr.write("%s is not a valid file mode" % (args[1]))
         except IndexError:
-            mode = 'w'
+            mode = "w"
         try:
             f = shell.syscall.open_file(path, mode)
             for line in shell.stdin.read():
-                f.write("%s\n" % (line, ))
+                f.write("%s\n" % (line,))
             f.close()
-        except:
+        except Exception:
             shell.stderr.write("file error")
     else:
         shell.stderr.write("missing file operand")
 
-def help():
+
+def help() -> str:
     a = """
     Write
 

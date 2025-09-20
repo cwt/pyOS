@@ -1,5 +1,5 @@
 def run(shell, args):
-    #hack to fix encapsulation
+    # hack to fix encapsulation
     shell = shell.parent
     if not args:
         for x in shell.aliases:
@@ -11,6 +11,7 @@ def run(shell, args):
                 shell.aliases[key] = value
             else:
                 shell.stderr.write("")
+
 
 def help():
     a = """

@@ -1,10 +1,17 @@
 import re
 
 from kernel.system import System
-from kernel.constants import OSNAME, RUNNING, PIPECHAR, VARCHAR, \
-        INCHAR, OUTCHAR, APPENDCHAR
+from kernel.constants import (
+    OSNAME,
+    RUNNING,
+    PIPECHAR,
+    VARCHAR,
+    INCHAR,
+    OUTCHAR,
+    APPENDCHAR,
+)
 
-varparse = re.compile(r"\%s\w*" % (VARCHAR, ))
+varparse = re.compile(r"\%s\w*" % (VARCHAR,))
 stdioparse = re.compile(r"([%s%s]+\s*\w+)" % (OUTCHAR, INCHAR))
 quoteparse = re.compile(r"""(\"[^\"]*\"|\'[^\']*\'|\|)""")
 subparse = re.compile(r"""s(?P<lim>.)(.*?)(?P=lim)(.*?)(?P=lim)""")
@@ -12,10 +19,16 @@ bangparse = re.compile(r"""(\!+[^!]*)""")
 # r"""(\!\!|(?<!\\)\![^!\s]*|\s+)"""
 braceparse = re.compile(r"""((?<!\$)\{[^\{\}]*\})""")
 
+
 def run(shell, args):
-    user = shell.get_var('USER')
+    user = shell.get_var("USER")
     while System.state >= RUNNING:
-        data = raw_input("%s@%s:%s$ "% (user, OSNAME, shell.get_path()))
+        try:
+            data = input("%s@%s:%s$ " % (user, OSNAME, shell.get_path()))
+        except EOFError:
+            # Handle Ctrl+D gracefully by exiting
+            print()  # Print a newline for clean exit
+            break
         data = data.strip()
         if data:
             cleaned, command = shell_expansion(shell, data)
@@ -29,6 +42,7 @@ def run(shell, args):
             for x in shells:
                 x.join()
 
+
 def quote_split(string):
     a = []
     for x in re.split(quoteparse, string):
@@ -38,68 +52,71 @@ def quote_split(string):
             a.append(x)
     return a
 
+
 def get_hist(shell, value):
-    if ':' in value:
-        search, word = value.split(':')
+    if ":" in value:
+        search, word = value.split(":")
     elif value[0] in "$^*":
         word = value
-        search = ''
+        search = ""
     else:
-        word = ''
+        word = ""
         search = value
 
-    command = ''
+    command = ""
     if search:
-        if search.startswith('!'):
+        if search.startswith("!"):
             command = shell.prevcommands[-1]
-        elif search.startswith('?'):
+        elif search.startswith("?"):
             command = shell.hist_find(search[1:], False)
-        elif search.isdigit() or (search.startswith('-') and search[1:].isdigit()):
+        elif search.isdigit() or (
+            search.startswith("-") and search[1:].isdigit()
+        ):
             command = shell.prevcommands[int(search)]
         else:
             command = shell.hist_find(search)
 
     d = {
-        '$': lambda : slice(-1, None),
-        '^': lambda : slice(1, 2),
-        '*': lambda : slice(1, None),
-        '-': lambda x, y: slice(x, y)
+        "$": lambda: slice(-1, None),
+        "^": lambda: slice(1, 2),
+        "*": lambda: slice(1, None),
+        "-": lambda x, y: slice(x, y),
     }
     execute = True
     if word:
-        if command == '':
+        if command == "":
             command = shell.prevcommands[-1]
         # remove special chars
-        new = ''
-        options = ''
+        new = ""
+        options = ""
         for char in word:
             if char not in "eghqrtx&":
                 new += char
             else:
-                if char == 'p':
+                if char == "p":
                     execute = False
                 options += char
-        subs = []
         substitutesplit = re.split(subparse, new)
         # magic number from spacing in search (text, sep, find, replace, text, ...)
-        word = ''.join(substitutesplit[::4])
+        word = "".join(substitutesplit[::4])
 
         if word[0] in "$^*":
             slicer = d[word[0]]()
-        elif '-' in word:
-            split = [int(x) if x.isdigit() else None for x in word.split('-')]
+        elif "-" in word:
+            split = [int(x) if x.isdigit() else None for x in word.split("-")]
             if split[0] is None:
                 split[0] = 0
-            slicer = d['-'](split[0], split[1])
+            slicer = d["-"](split[0], split[1])
         else:
             slicer = int(word)
     else:
         slicer = slice(None)
     return quote_split(command)[slicer], execute
 
+
 def bang_replacement(shell, listing):
     # http://www.softpanorama.org/Scripting/Shellorama/bash_command_history_reuse.shtml
-    '''
+    """
     n           line n
     -n          n lines back
     !           last command
@@ -125,14 +142,14 @@ def bang_replacement(shell, listing):
     x           quote the generated text, but break into words at blanks and newline
     &           repeat the last substitution
 
-    '''
+    """
     bang = []
     execute = True
     for part in listing:
-        if not part.startswith(('"', "'")) and '!' in part:
+        if not part.startswith(('"', "'")) and "!" in part:
             for x in re.split(bangparse, part):
                 y = True
-                if x.startswith("!") and x != '!':
+                if x.startswith("!") and x != "!":
                     x, y = get_hist(shell, x[1:])
                     bang.extend(x)
                 elif x:
@@ -142,13 +159,14 @@ def bang_replacement(shell, listing):
         else:
             bang.append(part)
     if bang != listing:
-        shell.stdout.write(' '.join(bang))
+        shell.stdout.write(" ".join(bang))
     return bang, execute
+
 
 def filename_expansion(shell, listing):
     filenames = []
-    inter = set('*?').intersection
-    sub = set('[]').issubset
+    inter = set("*?").intersection
+    sub = set("[]").issubset
     for part in listing:
         if not part.startswith(('"', "'")) and (inter(part) or sub(part)):
             filenames.extend(shell.syscall.list_glob(shell.sabs_path(part)))
@@ -156,15 +174,16 @@ def filename_expansion(shell, listing):
             filenames.append(part)
     return filenames
 
+
 def brace_expansion(shell, listing):
     def expand(remaining, curlist=None):
-        '''
+        """
         {a,b}{c,d}{e,f}
 
                 a               b
            ac      ad      bc      bd
         ace acf ade adf bce bcf bde bdf
-        '''
+        """
         out = []
         if curlist is None:
             out = remaining[0]
@@ -184,7 +203,7 @@ def brace_expansion(shell, listing):
             for i, (start, end) in enumerate(zip(item[::2], item[1::2])):
                 temp2 = []
                 # [1:-1] removes braces
-                for part in end[1:-1].split(','):
+                for part in end[1:-1].split(","):
                     if i == len2:
                         temp2.append(start + part + item[-1])
                     else:
@@ -195,7 +214,7 @@ def brace_expansion(shell, listing):
         return out
 
     braces = []
-    inter = set('{}').intersection
+    inter = set("{}").intersection
     for part in listing:
         if not part.startswith(('"', "'")) and inter(part):
             compressed = compress(re.split(braceparse, part))
@@ -203,6 +222,7 @@ def brace_expansion(shell, listing):
         else:
             braces.append(part)
     return braces
+
 
 def tilde_expansion(string):
     if string == "~+":
@@ -213,6 +233,7 @@ def tilde_expansion(string):
         out = "$HOME"
     return out
 
+
 def shell_expansion(shell, string):
     # http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_03_04.html
     quote = quote_split(string)
@@ -222,9 +243,8 @@ def shell_expansion(shell, string):
         bang, execute = bang_replacement(shell, quote)
     else:
         bang = quote
-        execute = True
 
-    #if execute:
+    # if execute:
 
     braces = brace_expansion(shell, bang)
 
@@ -232,8 +252,14 @@ def shell_expansion(shell, string):
     subed = [re.sub("~[\+-]?", tilde_expansion, xs) for xs in braces]
 
     # replace $vars
-    cleaned = [re.sub(varparse, shell.get_var, xs) if not xs.startswith(("'", '"'))
-                else xs for xs in subed]
+    cleaned = [
+        (
+            re.sub(varparse, shell.get_var, xs)
+            if not xs.startswith(("'", '"'))
+            else xs
+        )
+        for xs in subed
+    ]
 
     # command sub
 
@@ -242,7 +268,8 @@ def shell_expansion(shell, string):
 
     # strip quotes
     unquoted = [x.strip('"').strip("'") for x in filenames]
-    return unquoted, ' '.join(bang)
+    return unquoted, " ".join(bang)
+
 
 def eval_input(shell, cleaned):
     b = [[None, [], None, None]]
@@ -259,49 +286,63 @@ def eval_input(shell, cleaned):
                     b.append([None, [], None, None])
                 if part in shell.aliases:
                     part = shell.aliases[part]
-                b[-1][0] = part         # program
+                b[-1][0] = part  # program
             elif state == "args":
-                b[-1][1].append(part)   # args
+                b[-1][1].append(part)  # args
             elif state == INCHAR and not b[-1][2]:
-                b[-1][2] = part         # stdin
+                b[-1][2] = part  # stdin
             elif state == OUTCHAR and not b[-1][3]:
-                b[-1][3] = (part, 'w')  # stdout
+                b[-1][3] = (part, "w")  # stdout
             elif state == APPENDCHAR and not b[-1][3]:
-                b[-1][3] = (part, 'a')  #stdout append
+                b[-1][3] = (part, "a")  # stdout append
             state = "args"
     # [[program, [arg0, arg1, ...], cin, (cout, mode)], ...]
     return b
+
 
 def start_shells(parent, programs):
     path = parent.get_path()
 
     proper = []
-    for (programname, args, cin, cout) in programs:
-        #hack to convert cin into streams from cat.
+    for programname, args, cin, cout in programs:
+        # hack to convert cin into streams from cat.
         if cin:
-            newcin = System.new_shell(parent=parent, path=path,
-                         program="cat", args=[cin])
+            newcin = System.new_shell(
+                parent=parent, path=path, program="cat", args=[cin]
+            )
         else:
             newcin = cin
 
-        newshell = System.new_shell(parent=parent, stdin=newcin, path=path,
-                program=programname, args=args)
+        newshell = System.new_shell(
+            parent=parent,
+            stdin=newcin,
+            path=path,
+            program=programname,
+            args=args,
+        )
 
-        #hack to convert cout into streams to write
+        # hack to convert cout into streams to write
         if cout:
-            newcout = System.new_shell(parent=parent, stdin=newcin, path=path,
-                         program="write", args=cout)
+            newcout = System.new_shell(
+                parent=parent,
+                stdin=newcin,
+                path=path,
+                program="write",
+                args=cout,
+            )
         else:
             newcout = cout
         proper.extend([x for x in [newcin, newshell, newcout] if x])
-    #(Scin0, shell0, Scout0, Scin1 ...)
+    # (Scin0, shell0, Scout0, Scin1 ...)
     connect_shells(proper)
     return proper
 
+
 def connect_shells(shells):
-    #connect the seperate programs
+    # connect the seperate programs
     for p0, p1 in zip(shells[:-1], shells[1:]):
         p0.stdout.set_reader(p1)
+
 
 def help():
     a = """

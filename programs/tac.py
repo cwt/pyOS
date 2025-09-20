@@ -2,7 +2,7 @@ def run(shell, args):
     if args:
         path = shell.sabs_path(args[0])
         if shell.syscall.exists(path):
-            f = shell.syscall.open_file(path, 'r')
+            f = shell.syscall.open_file(path, "r")
             for line in reversed(f.readlines()):
                 shell.stdout.write(line)
             f.close()
@@ -10,6 +10,7 @@ def run(shell, args):
             shell.stderr.write("%s does not exist" % (path))
     else:
         shell.stderr.write("missing file operand")
+
 
 def help():
     a = """

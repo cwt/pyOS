@@ -1,13 +1,20 @@
 from kernel.utils import Parser
+from typing import Any, List
+
 
 desc = "Creates a directory at the given path."
-parser = Parser('mkdir', name="Make Directory", description=desc)
+parser = Parser("mkdir", name="Make Directory", description=desc)
 pa = parser.add_argument
-pa('paths', type=str, nargs='*',)
-pa('-p', action="store_true", dest="parent", default=False)
-pa('-v', action="store_true", dest="verbose", default=False)
+pa(
+    "paths",
+    type=str,
+    nargs="*",
+)
+pa("-p", action="store_true", dest="parent", default=False)
+pa("-v", action="store_true", dest="verbose", default=False)
 
-def run(shell, args):
+
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
     args = parser.parse_args(args)
     if not parser.help:
@@ -17,7 +24,8 @@ def run(shell, args):
         else:
             shell.stderr.write("missing directory operand")
 
-def make_dir(shell, args, path):
+
+def make_dir(shell: Any, args: Any, path: str) -> None:
     path = shell.sabs_path(path)
     if not shell.syscall.exists(path):
         paths = []
@@ -31,15 +39,16 @@ def make_dir(shell, args, path):
             paths.append(path)
         for x in reversed(paths):
             if args.verbose:
-                shell.stdout.write("Making directory: %s" %(path, ))
+                shell.stdout.write("Making directory: %s" % (path,))
             try:
                 shell.syscall.make_dir(x)
             except IOError:
-                shell.stderr.write("could not make directory %s" % (path, ))
+                shell.stderr.write("could not make directory %s" % (path,))
                 break
                 # TODO # delete on fail?
     else:
-        shell.stderr.write("%s already exists" % (path, ))
+        shell.stderr.write("%s already exists" % (path,))
 
-def help():
+
+def help() -> str:
     return parser.help_msg()

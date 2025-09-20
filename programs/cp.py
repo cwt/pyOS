@@ -1,21 +1,31 @@
 from kernel.utils import Parser
+from typing import Any, List
+
 
 desc = "Copies the given file/directory to the given location."
-parser = Parser('cp', name="Copy", description=desc)
+parser = Parser("cp", name="Copy", description=desc)
 pa = parser.add_argument
-pa('paths', type=str, nargs='*',)
-pa('-f', action="store_true", dest="force", default=False)
-pa('-r', action="store_true", dest="recursive", default=False)
-pa('-v', action="store_true", dest="verbose", default=False)
+pa(
+    "paths",
+    type=str,
+    nargs="*",
+)
+pa("-f", action="store_true", dest="force", default=False)
+pa("-r", action="store_true", dest="recursive", default=False)
+pa("-v", action="store_true", dest="verbose", default=False)
 
-def run(shell, args):
+
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
     args = parser.parse_args(args)
     if not parser.help:
         if len(args.paths) >= 2:
             dest = shell.sabs_path(args.paths[-1])
-            if shell.syscall.is_dir(dest) or len(args.paths) == 2 \
-                    or not shell.syscall.exists(dest):
+            if (
+                shell.syscall.is_dir(dest)
+                or len(args.paths) == 2
+                or not shell.syscall.exists(dest)
+            ):
                 for src in args.paths[:-1]:
                     copy(shell, args, src, dest)
             else:
@@ -23,7 +33,8 @@ def run(shell, args):
         else:
             shell.stderr.write("missing file operand")
 
-def copy(shell, args, src, dest):
+
+def copy(shell: Any, args: Any, src: str, dest: str) -> None:
     src = shell.sabs_path(src)
 
     if args.recursive and shell.syscall.is_dir(src):
@@ -39,7 +50,7 @@ def copy(shell, args, src, dest):
 
     for path in srcpaths:
         relpath = shell.srel_path(path, src)
-        if relpath != '.':
+        if relpath != ".":
             destpath = shell.syscall.join_path(destbase, relpath)
         else:
             destpath = destbase
@@ -58,7 +69,8 @@ def copy(shell, args, src, dest):
         except OSError:
             shell.stderr.write("file error " + destpath)
 
-def copy_dir(shell, src, dest):
+
+def copy_dir(shell: Any, src: str, dest: str) -> None:
     shell.syscall.make_dir(dest)
     # TODO # add copy metedata to syscalls?
     meta = shell.syscall.get_meta_data(src)
@@ -66,5 +78,6 @@ def copy_dir(shell, src, dest):
     shell.syscall.set_permission(dest, meta[2])
     shell.syscall.set_time(dest, meta[3:6])
 
-def help():
+
+def help() -> str:
     return parser.help_msg()

@@ -1,9 +1,14 @@
 from kernel.utils import Parser
 
 desc = "Returns the command history."
-parser = Parser('history', name="History", description=desc)
+parser = Parser("history", name="History", description=desc)
 pa = parser.add_argument
-pa('bla', type=str, nargs='*',)
+pa(
+    "bla",
+    type=str,
+    nargs="*",
+)
+
 
 def run(shell, args):
     parser.add_shell(shell)
@@ -17,6 +22,7 @@ def run(shell, args):
             else:
                 msg = line
             shell.stdout.write(msg)
+
 
 def help():
     return parser.help_msg()

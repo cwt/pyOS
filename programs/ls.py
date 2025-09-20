@@ -1,13 +1,20 @@
-from kernel.utils import Parser, calc_permission_string
+from kernel.utils import Parser
+from typing import Any, List
+
 
 desc = "Returns the contents of a directory."
-parser = Parser('ls', name="List Directory", description=desc)
+parser = Parser("ls", name="List Directory", description=desc)
 pa = parser.add_argument
-pa('paths', type=str, nargs='*',)
-pa('-l', action="store_true", dest="long", default=False)
-pa('-a', action="store_true", dest="all", default=False)
+pa(
+    "paths",
+    type=str,
+    nargs="*",
+)
+pa("-l", action="store_true", dest="long", default=False)
+pa("-a", action="store_true", dest="all", default=False)
 
-def run(shell, args):
+
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
     args = parser.parse_args(args)
     if not parser.help:
@@ -18,27 +25,35 @@ def run(shell, args):
         for relpath in sorted(paths):
             ls(shell, relpath, args)
 
-def ls(shell, relpath, args):
-    fscp = calc_permission_string
+
+def ls(shell: Any, relpath: str, args: Any) -> None:
     fsgm = shell.syscall.get_meta_data
     fsbn = shell.syscall.base_name
-    format = "%s %s %s %s"
+    format_str = "%s %s %s %s"
     path = shell.sabs_path(relpath)
     try:
         a = shell.syscall.list_dir(path)
         if args.long:
-            b = [fsgm(shell.sabs_path(shell.syscall.join_path(path, x))) for x in a]
-            a = [format % (fscp(perm), owner, "1", fsbn(name)) for name, owner, perm in b]
+            b = [
+                fsgm(shell.sabs_path(shell.syscall.join_path(path, x)))
+                for x in a
+            ]
+            # Unpack all 6 values from metadata: path, owner, permission, created, accessed, modified
+            # Use the permission string directly since it's already in string format
+            a = [
+                format_str % (perm, owner, "1", fsbn(name))
+                for name, owner, perm, _, _, _ in b
+            ]
 
         if len(args.paths) > 1:
-            shell.stdout.write("%s:" % (relpath, ))
+            shell.stdout.write("%s:" % (relpath,))
         if shell.stdout or args.long:
-            shell.stdout.write('\n'.join(a))
+            shell.stdout.write("\n".join(a))
         else:
             if a:
                 maxlen = max(max([len(x) for x in a]), 1)
                 # arbitrary line length
-                columns = (80 / maxlen) - 1
+                columns = (80 // maxlen) - 1
                 b = []
                 for i, x in enumerate(a):
                     newline = "\n" if not ((i + 1) % columns) else ""
@@ -49,11 +64,14 @@ def ls(shell, relpath, args):
                         newline = ""
                         spacing = " " * (maxlen - len(x) + 1)
                     b.append(x + spacing + newline)
-                shell.stdout.write(''.join(b).rstrip())
+                shell.stdout.write("".join(b).rstrip())
         if len(args.paths) > 1:
             shell.stdout.write("")
     except OSError:
-        shell.stderr.write('ls: cannot acces %s: no such file or directory\n' % (relpath, ))
+        shell.stderr.write(
+            "ls: cannot acces %s: no such file or directory\n" % (relpath,)
+        )
 
-def help():
+
+def help() -> str:
     return parser.help_msg()

@@ -1,9 +1,13 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     shell.stdout.write(" ".join(args))
     if not shell.stdout:
-        shell.stdout.write('')
+        shell.stdout.write("")
 
-def help():
+
+def help() -> str:
     a = """
     Echo
 
