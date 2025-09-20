@@ -66,9 +66,12 @@ def ls(shell: Any, relpath: str, args: Any) -> None:
                             newline = ""
                             spacing = " " * (maxlen - len(x) + 1)
                         b.append(x + spacing + newline)
-                    shell.stdout.write("".join(b).rstrip())
+                    output = "".join(b).rstrip()
+                    shell.stdout.write(output)
+                    if output:  # Only add newline if there was output
+                        shell.stdout.write("\n")
             if len(args.paths) > 1:
-                shell.stdout.write("")
+                shell.stdout.write("\n")
         except OSError:
             shell.stderr.write(
                 "ls: cannot acces %s: no such file or directory\n" % (relpath,)
