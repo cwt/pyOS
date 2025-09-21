@@ -10,12 +10,13 @@ def run(shell: Any, args: List[str]) -> None:
                 mode = args[1]
             else:
                 shell.stderr.write("%s is not a valid file mode" % (args[1]))
+                return
         except IndexError:
             mode = "w"
         f = handle_file_operation(shell, path, "open", mode)
         if f:
 
-            def write_line(line):
+            def write_line(line: str) -> None:
                 f.write("%s\n" % (line,))
 
             process_stdin(shell, write_line)

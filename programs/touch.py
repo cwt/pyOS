@@ -1,4 +1,5 @@
 import datetime
+import argparse
 from typing import Any, List, Optional
 
 from kernel.utils import Parser
@@ -21,17 +22,17 @@ pa("-t", action="store", type=str, dest="timestamp", default=None)
 
 def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        timestuff = any([args.date, args.timestamp])
-        if args.paths:
-            if args.date and args.timestamp:
+        timestuff = any([parsed_args.date, parsed_args.timestamp])
+        if parsed_args.paths:
+            if parsed_args.date and parsed_args.timestamp:
                 write_error(
                     shell, "cannot specify times from more than one source"
                 )
             else:
-                times = get_times(args)
-                for x in args.paths:
+                times = get_times(parsed_args)
+                for x in parsed_args.paths:
                     path = resolve_path(shell, x)
                     if not handle_file_operation(shell, path, "is_dir"):
                         f = handle_file_operation(shell, path, "open", "a")
@@ -43,7 +44,7 @@ def run(shell: Any, args: List[str]) -> None:
             write_error(shell, "missing file operand")
 
 
-def get_times(args: Any) -> List[Optional[datetime.datetime]]:
+def get_times(args: argparse.Namespace) -> List[Optional[datetime.datetime]]:
     time = None
     types = [args.accessed, args.created, args.modified]
     if args.date is not None:

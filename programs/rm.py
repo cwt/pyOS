@@ -1,3 +1,4 @@
+import argparse
 from kernel.utils import Parser
 from typing import Any, List
 from kernel.common import resolve_path, handle_file_operation
@@ -18,23 +19,23 @@ pa("-v", action="store_true", dest="verbose", default=False)
 
 def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if len(args.paths) >= 1:
-            for path in args.paths:
-                remove(shell, args, path)
+        if len(parsed_args.paths) >= 1:
+            for path in parsed_args.paths:
+                remove(shell, parsed_args, path)
         else:
             shell.stderr.write("missing file operand")
 
 
-def remove(shell: Any, args: Any, path: str) -> None:
+def remove(shell: Any, args: argparse.Namespace, path: str) -> None:
     path = resolve_path(shell, path)
 
     if handle_file_operation(shell, path, "is_dir"):
         if args.recursive:
             paths = []
 
-            def collect_paths(current_path):
+            def collect_paths(current_path: str) -> None:
                 paths.append(current_path)
                 if handle_file_operation(shell, current_path, "is_dir"):
                     for item in shell.syscall.list_dir(current_path):

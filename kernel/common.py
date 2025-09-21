@@ -2,16 +2,17 @@
 Common utility functions to eliminate code duplication across the pyOS project.
 """
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Callable
 
 
 def resolve_path(shell: Any, path: str) -> str:
     """Resolve a path to its absolute form using the shell's sabs_path method."""
-    return shell.sabs_path(path)
+    result = shell.sabs_path(path)
+    return str(result) if result is not None else path
 
 
 def handle_file_operation(
-    shell: Any, path: str, operation: str, *args, **kwargs
+    shell: Any, path: str, operation: str, *args: Any, **kwargs: Any
 ) -> Optional[Any]:
     """Generic file operation handler with error handling."""
     try:
@@ -45,7 +46,7 @@ def handle_file_operation(
         return None
 
 
-def process_stdin(shell: Any, processor_func: callable) -> None:
+def process_stdin(shell: Any, processor_func: Callable[[str], None]) -> None:
     """Generic stdin processing function."""
     if shell.stdin:
         for line in shell.stdin.read():
@@ -77,10 +78,13 @@ def validate_paths(
     return valid_paths, invalid_paths
 
 
-def get_file_metadata(shell: Any, path: str) -> Optional[Tuple]:
+def get_file_metadata(shell: Any, path: str) -> Optional[Tuple[Any, ...]]:
     """Get metadata for a file."""
     try:
-        return shell.syscall.get_meta_data(path)
+        result = shell.syscall.get_meta_data(path)
+        if result is not None and isinstance(result, tuple):
+            return tuple(result)
+        return None
     except Exception:
         return None
 

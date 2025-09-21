@@ -3,7 +3,7 @@ from kernel.io_utils import write_output
 
 
 def run(shell: Any, args: List[str]) -> None:
-    write_output(shell, shell.get_path())
+    write_output(shell, shell.path)
 
 
 def help() -> str:

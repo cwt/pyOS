@@ -1,4 +1,7 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     # hack to fix encapsulation
     shell = shell.parent
     if not args:
@@ -13,7 +16,7 @@ def run(shell, args):
                 shell.stderr.write("")
 
 
-def help():
+def help() -> str:
     a = """
     Alias
 

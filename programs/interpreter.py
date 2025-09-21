@@ -1,9 +1,9 @@
 import re
+from typing import Any, List, Tuple, Optional, Union, Match, Dict, Callable
 
-from kernel.system import System
 from kernel.constants import (
     OSNAME,
-    RUNNING,
+    SystemState,
     PIPECHAR,
     VARCHAR,
     INCHAR,
@@ -20,13 +20,13 @@ bangparse = re.compile(r"""(\!+[^!]*)""")
 braceparse = re.compile(r"""((?<!\$)\{[^\{\}]*\})""")
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     user = shell.get_var("USER")
-    while System.state >= RUNNING:
+    while int(shell.system.state) >= SystemState.RUNNING:
         try:
-            data = input("%s@%s:%s$ " % (user, OSNAME, shell.get_path()))
+            data = input("%s@%s:%s$ " % (user, OSNAME, shell.path))
         except EOFError:
-            # Handle Ctrl+D gracefully by exiting
+            # Handle Ctrl+D gracefully by exiting the interpreter
             print()  # Print a newline for clean exit
             break
         data = data.strip()
@@ -43,8 +43,8 @@ def run(shell, args):
                 x.join()
 
 
-def quote_split(string):
-    a = []
+def quote_split(string: str) -> List[str]:
+    a: List[str] = []
     for x in re.split(quoteparse, string):
         if not x.startswith(("'", '"')):
             a.extend(x.strip().split())
@@ -53,7 +53,7 @@ def quote_split(string):
     return a
 
 
-def get_hist(shell, value):
+def get_hist(shell: Any, value: str) -> Tuple[List[str], bool]:
     if ":" in value:
         search, word = value.split(":")
     elif value[0] in "$^*":
@@ -76,11 +76,11 @@ def get_hist(shell, value):
         else:
             command = shell.hist_find(search)
 
-    d = {
-        "$": lambda: slice(-1, None),
-        "^": lambda: slice(1, 2),
-        "*": lambda: slice(1, None),
-        "-": lambda x, y: slice(x, y),
+    d: Dict[str, Callable[..., slice]] = {
+        "$": lambda x=None, y=None: slice(-1, None),
+        "^": lambda x=None, y=None: slice(1, 2),
+        "*": lambda x=None, y=None: slice(1, None),
+        "-": lambda x=0, y=None: slice(x, y),
     }
     execute = True
     if word:
@@ -103,7 +103,9 @@ def get_hist(shell, value):
         if word[0] in "$^*":
             slicer = d[word[0]]()
         elif "-" in word:
-            split = [int(x) if x.isdigit() else None for x in word.split("-")]
+            split: List[Optional[int]] = [
+                int(x) if x.isdigit() else None for x in word.split("-")
+            ]
             if split[0] is None:
                 split[0] = 0
             slicer = d["-"](split[0], split[1])
@@ -114,7 +116,7 @@ def get_hist(shell, value):
     return quote_split(command)[slicer], execute
 
 
-def bang_replacement(shell, listing):
+def bang_replacement(shell: Any, listing: List[str]) -> Tuple[List[str], bool]:
     # http://www.softpanorama.org/Scripting/Shellorama/bash_command_history_reuse.shtml
     """
     n           line n
@@ -163,7 +165,7 @@ def bang_replacement(shell, listing):
     return bang, execute
 
 
-def filename_expansion(shell, listing):
+def filename_expansion(shell: Any, listing: List[str]) -> List[str]:
     filenames = []
     inter = set("*?").intersection
     sub = set("[]").issubset
@@ -175,8 +177,10 @@ def filename_expansion(shell, listing):
     return filenames
 
 
-def brace_expansion(shell, listing):
-    def expand(remaining, curlist=None):
+def brace_expansion(shell: Any, listing: List[str]) -> List[str]:
+    def expand(
+        remaining: List[List[str]], curlist: Optional[List[str]] = None
+    ) -> List[str]:
         """
         {a,b}{c,d}{e,f}
 
@@ -195,7 +199,7 @@ def brace_expansion(shell, listing):
             out = expand(remaining[1:], out)
         return out
 
-    def compress(item):
+    def compress(item: List[str]) -> List[List[str]]:
         out = []
         if len(item) > 1:
             # used to find the last iteration
@@ -224,17 +228,18 @@ def brace_expansion(shell, listing):
     return braces
 
 
-def tilde_expansion(string):
+def tilde_expansion(match: Match[str]) -> str:
+    string = match.group(0)
     if string == "~+":
         out = "$PWD"
-    if string == "~-":
+    elif string == "~-":
         out = "$OLDPWD"
     else:
         out = "$HOME"
     return out
 
 
-def shell_expansion(shell, string):
+def shell_expansion(shell: Any, string: str) -> Tuple[List[str], str]:
     # http://tldp.org/LDP/Bash-Beginners-Guide/html/sect_03_04.html
     quote = quote_split(string)
 
@@ -249,12 +254,12 @@ def shell_expansion(shell, string):
     braces = brace_expansion(shell, bang)
 
     # tilde expansion
-    subed = [re.sub("~[\+-]?", tilde_expansion, xs) for xs in braces]
+    subed = [re.sub(r"~[\+-]?", tilde_expansion, xs) for xs in braces]
 
     # replace $vars
     cleaned = [
         (
-            re.sub(varparse, shell.get_var, xs)
+            re.sub(varparse, lambda m: str(shell.get_var(m.group(0))), xs)
             if not xs.startswith(("'", '"'))
             else xs
         )
@@ -271,8 +276,12 @@ def shell_expansion(shell, string):
     return unquoted, " ".join(bang)
 
 
-def eval_input(shell, cleaned):
-    b = [[None, [], None, None]]
+def eval_input(
+    shell: Any, cleaned: List[str]
+) -> List[List[Union[str, List[str], str, Tuple[str, str], None]]]:
+    b: List[List[Union[str, List[str], str, Tuple[str, str], None]]] = [
+        ["", [], "", None]
+    ]
     state = None
     charstates = [APPENDCHAR, OUTCHAR, INCHAR, PIPECHAR]
     for part in cleaned:
@@ -283,12 +292,13 @@ def eval_input(shell, cleaned):
         else:
             if state in [None, PIPECHAR]:
                 if state == PIPECHAR:
-                    b.append([None, [], None, None])
+                    b.append(["", [], "", ("", "")])
                 if part in shell.aliases:
                     part = shell.aliases[part]
                 b[-1][0] = part  # program
             elif state == "args":
-                b[-1][1].append(part)  # args
+                if isinstance(b[-1][1], list):
+                    b[-1][1].append(part)  # args
             elif state == INCHAR and not b[-1][2]:
                 b[-1][2] = part  # stdin
             elif state == OUTCHAR and not b[-1][3]:
@@ -300,20 +310,23 @@ def eval_input(shell, cleaned):
     return b
 
 
-def start_shells(parent, programs):
-    path = parent.get_path()
+def start_shells(
+    parent: Any,
+    programs: List[List[Union[str, List[str], str, Tuple[str, str], None]]],
+) -> List[Any]:
+    path = parent.path
 
     proper = []
     for programname, args, cin, cout in programs:
         # hack to convert cin into streams from cat.
         if cin:
-            newcin = System.new_shell(
+            newcin = parent.system.new_shell(
                 parent=parent, path=path, program="cat", args=[cin]
             )
         else:
             newcin = cin
 
-        newshell = System.new_shell(
+        newshell = parent.system.new_shell(
             parent=parent,
             stdin=newcin,
             path=path,
@@ -323,7 +336,7 @@ def start_shells(parent, programs):
 
         # hack to convert cout into streams to write
         if cout:
-            newcout = System.new_shell(
+            newcout = parent.system.new_shell(
                 parent=parent,
                 stdin=newcin,
                 path=path,
@@ -338,13 +351,13 @@ def start_shells(parent, programs):
     return proper
 
 
-def connect_shells(shells):
+def connect_shells(shells: List[Any]) -> None:
     # connect the seperate programs
     for p0, p1 in zip(shells[:-1], shells[1:]):
         p0.stdout.set_reader(p1)
 
 
-def help():
+def help() -> str:
     a = """
     Interpreter
 

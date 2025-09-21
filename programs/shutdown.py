@@ -1,12 +1,13 @@
 from kernel.system import System
 from kernel.constants import SHUTDOWN
+from typing import Any, List
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     System.state = SHUTDOWN
 
 
-def help():
+def help() -> str:
     a = """
     Shutdown
 

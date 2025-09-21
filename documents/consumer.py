@@ -1,12 +1,13 @@
 import time
 import random
+from typing import Any, List
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     for line in shell.stdin.read():
         print(line)
         time.sleep(1 * random.random())
 
 
-def help():
+def help() -> str:
     return ""

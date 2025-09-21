@@ -1,4 +1,6 @@
+from typing import Any, List
 from kernel.utils import Parser
+
 
 desc = "Allows tapping into the stdout to write to multiple files."
 parser = Parser("tee", name="Tee", description=desc)
@@ -11,18 +13,18 @@ pa(
 pa("-a", action="store_true", dest="append", default=False)
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if args.paths:
-            if args.append:
+        if parsed_args.paths:
+            if parsed_args.append:
                 mode = "a"
             else:
                 mode = "w"
-            if args.paths:
+            if parsed_args.paths:
                 files = []
-                for x in args.paths:
+                for x in parsed_args.paths:
                     try:
                         files.append(shell.syscall.open_file(x, mode))
                     except Exception:
@@ -39,5 +41,5 @@ def run(shell, args):
                 shell.stdout.write(line)
 
 
-def help():
+def help() -> str:
     return parser.help_msg()

@@ -1,4 +1,5 @@
 from typing import Any, Optional, List, Union
+from kernel.logging import logger
 
 
 class Pipe:
@@ -20,7 +21,7 @@ class Pipe:
         self.closed = False
 
     def __bool__(self) -> bool:
-        return bool(self.reader)
+        return True
 
     def set_reader(self, callback: Any) -> None:
         self.reader = callback
@@ -34,18 +35,16 @@ class Pipe:
             self.value.extend(str(value).split("\n"))
 
     def read(self) -> Any:
-        line = ""
-        while line is not None:
-            for line in self.value[self._line :]:
-                if line is None:
-                    break
-                yield line
-                self._line += 1
+        for line in self.value[self._line :]:
+            if line is None:
+                break
+            yield line
+            self._line += 1
 
     def readline(self) -> str:
-        line = self.value[self._line]
+        line = self.value[self._line] if self._line < len(self.value) else None
         self._line += 1
-        return line
+        return line if line is not None else ""
 
     def readlines(self) -> List[Union[str, None]]:
         return self.value
@@ -67,11 +66,33 @@ class Pipe:
             pass  # self.reader()
         else:
             if any(self.value):
-                print(
-                    "<%s> %s"
-                    % (self.name, "\n".join(str(x) for x in self.value[:-1])),
-                    end=" ",
-                )
+                # Determine what to filter: if last element is None (pipe closed), exclude it
+                if self.value and self.value[-1] is None:
+                    # Pipe is closed, exclude the None terminator
+                    values_to_process = self.value[:-1]
+                else:
+                    # Pipe is open, process all values
+                    values_to_process = self.value
+
+                # Filter out None values and empty strings
+                filtered_values = [
+                    str(x)
+                    for x in values_to_process
+                    if x is not None and x != ""
+                ]
+
+                # DEBUG: Print what we're working with
+                # print(f"DEBUG broadcast: filtered_values = {filtered_values}, len = {len(filtered_values)}")
+                if len(filtered_values) == 1:
+                    # Single line output
+                    logger.info("<%s> %s", self.name, filtered_values[0])
+                else:
+                    # Multi-line output with indentation
+                    indented_content = "\n".join(
+                        f"  {line}" for line in filtered_values
+                    )
+                    # print(f"DEBUG broadcast: logging multi-line: {indented_content}")
+                    logger.info("<%s>\n%s", self.name, indented_content)
 
     def __repr__(self) -> str:
         writer_pid = getattr(self.writer, "pid", "None")
@@ -84,4 +105,7 @@ class Pipe:
         )
 
     def __str__(self) -> str:
-        return "<Pipe %d: %s>" % (self._line, self.value[self._line])
+        line_value = (
+            self.value[self._line] if self._line < len(self.value) else ""
+        )
+        return "<Pipe %d: %s>" % (self._line, line_value)

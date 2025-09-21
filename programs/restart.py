@@ -1,12 +1,13 @@
 from kernel.system import System
 from kernel.constants import REBOOT
+from typing import Any, List
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     System.state = REBOOT
 
 
-def help():
+def help() -> str:
     a = """
     Restart
 

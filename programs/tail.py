@@ -1,3 +1,4 @@
+from typing import Any, List
 from kernel.utils import Parser
 from kernel.common import resolve_path
 from kernel.file_utils import read_file_lines
@@ -13,33 +14,33 @@ pa(
 pa("-n", action="store", type=int, dest="lineamount", default=5)
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        for x in args.paths:
+        for x in parsed_args.paths:
             path = resolve_path(shell, x)
-            if len(args.paths) > 1 or shell.stdin:
+            if len(parsed_args.paths) > 1 or shell.stdin:
                 shell.stdout.write("==> %s <==" % (x,))
             lines = read_file_lines(shell, path)
-            for line in lines[-args.lineamount :]:
+            for line in lines[-parsed_args.lineamount :]:
                 shell.stdout.write(line.rstrip())
         shell.stdout.write("")
         if shell.stdin:
-            if args.paths:
+            if parsed_args.paths:
                 shell.stdout.write("==> %% stdin %% <==")
             stdin_lines = []
             try:
                 stdin_lines = list(shell.stdin.readlines())
             except Exception:
                 pass
-            for line in stdin_lines[-args.lineamount :]:
+            for line in stdin_lines[-parsed_args.lineamount :]:
                 shell.stdout.write(line)
             shell.stdout.write("")
         else:
-            if not args.paths:
+            if not parsed_args.paths:
                 shell.stderr.write("missing file operand")
 
 
-def help():
+def help() -> str:
     return parser.help_msg()

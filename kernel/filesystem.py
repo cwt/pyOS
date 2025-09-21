@@ -2,9 +2,11 @@ import os
 import shutil
 import glob
 import importlib.util
-from typing import List
+from typing import List, Tuple, Any
+from contextlib import contextmanager
 
 from kernel.constants import BASEPATH
+from kernel.exceptions import FileNotFoundError, DirectoryNotEmptyError
 
 
 def abs_path(path: str) -> str:
@@ -45,7 +47,7 @@ def base_name(path: str) -> str:
     return os.path.basename(path)
 
 
-def split(path: str) -> tuple[str, str]:
+def split(path: str) -> Tuple[str, str]:
     return dir_name(path), base_name(path)
 
 
@@ -53,30 +55,50 @@ def split(path: str) -> tuple[str, str]:
 
 
 def exists(path: str) -> bool:
-    return os.path.exists(abs_path(path))
+    try:
+        return os.path.exists(abs_path(path))
+    except Exception:
+        return False
 
 
 def is_file(path: str) -> bool:
-    return os.path.isfile(abs_path(path))
+    try:
+        return os.path.isfile(abs_path(path))
+    except Exception:
+        return False
 
 
 def is_dir(path: str) -> bool:
-    return os.path.isdir(abs_path(path))
+    try:
+        return os.path.isdir(abs_path(path))
+    except Exception:
+        return False
 
 
 def copy(src: str, dst: str) -> None:
-    shutil.copy2(abs_path(src), abs_path(dst))
+    try:
+        shutil.copy2(abs_path(src), abs_path(dst))
+    except IOError as e:
+        raise FileNotFoundError(src, f"Failed to copy {src} to {dst}: {str(e)}")
 
 
 def remove(path: str) -> None:
-    os.remove(abs_path(path))
+    try:
+        os.remove(abs_path(path))
+    except OSError as e:
+        raise FileNotFoundError(path, f"Failed to remove {path}: {str(e)}")
 
 
 def remove_dir(path: str) -> None:
-    if list_dir(path) == []:
-        shutil.rmtree(abs_path(path))
-    else:
-        raise OSError
+    try:
+        if list_dir(path) == []:
+            shutil.rmtree(abs_path(path))
+        else:
+            raise DirectoryNotEmptyError(path)
+    except OSError as e:
+        raise DirectoryNotEmptyError(
+            path, f"Failed to remove directory {path}: {str(e)}"
+        )
 
 
 def get_size(path: str) -> int:
@@ -110,11 +132,22 @@ def make_dir(path: str) -> None:
     os.mkdir(abs_path(path))
 
 
-def open_file(path: str, mode: str):
+@contextmanager
+def open_file_context(path: str, mode: str) -> Any:
+    """Context manager for file operations."""
+    f = open(abs_path(path), mode)
+    try:
+        yield f
+    finally:
+        f.close()
+
+
+def open_file(path: str, mode: str) -> Any:
+    """Open a file and return a file object."""
     return open(abs_path(path), mode)
 
 
-def open_program(path: str):
+def open_program(path: str) -> Any:
     x = abs_path(path)
     if not is_dir(path):
         try:

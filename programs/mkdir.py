@@ -1,3 +1,4 @@
+import argparse
 from kernel.utils import Parser
 from typing import Any, List
 from kernel.common import resolve_path, handle_file_operation
@@ -18,16 +19,16 @@ pa("-v", action="store_true", dest="verbose", default=False)
 
 def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if args.paths:
-            for path in args.paths:
-                make_dir(shell, args, path)
+        if parsed_args.paths:
+            for path in parsed_args.paths:
+                make_dir(shell, parsed_args, path)
         else:
             write_error(shell, "missing directory operand")
 
 
-def make_dir(shell: Any, args: Any, path: str) -> None:
+def make_dir(shell: Any, args: argparse.Namespace, path: str) -> None:
     path = resolve_path(shell, path)
     if not handle_file_operation(shell, path, "exists"):
         paths = []

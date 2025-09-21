@@ -1,6 +1,8 @@
 import re
 import fnmatch
 import datetime
+import argparse
+from typing import Any, List, Optional, Dict
 
 from kernel.utils import Parser
 
@@ -59,26 +61,32 @@ pa("-nogroup", action="store_true", dest="nogroup", default=False)
 # -xtype [bcdpfls]
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if args.paths:
-            paths = args.paths
+        if parsed_args.paths:
+            paths = parsed_args.paths
         else:
             paths = ["/"]
         now = datetime.datetime.now()
-        perms = convert_permissions(shell, args)
-        times = convert_time(args, now)
+        perms = convert_permissions(shell, parsed_args)
+        times = convert_time(parsed_args, now)
         for path in paths:
-            a = find(shell, args, shell.sabs_path(path), perms, times)
+            a = find(shell, parsed_args, shell.sabs_path(path), perms, times)
             for x in a:
                 shell.stdout.write(x)
         if not shell.stdout:
             shell.stdout.write("")
 
 
-def find(shell, args, basepath, perms, times):
+def find(
+    shell: Any,
+    args: argparse.Namespace,
+    basepath: str,
+    perms: Optional[str],
+    times: Dict[str, List[Optional[datetime.datetime]]],
+) -> List[str]:
     done = []
     access, modify, create = times
     get_data = shell.syscall.get_all_meta_data
@@ -114,8 +122,14 @@ def find(shell, args, basepath, perms, times):
     return done
 
 
-def convert_time(args, now):
-    d = {"a": [None, None], "m": [None, None], "c": [None, None]}
+def convert_time(
+    args: argparse.Namespace, now: datetime.datetime
+) -> Dict[str, List[Optional[datetime.datetime]]]:
+    d: Dict[str, List[Optional[datetime.timedelta]]] = {
+        "a": [None, None],
+        "m": [None, None],
+        "c": [None, None],
+    }
 
     timeinc = {
         "w": "weeks",
@@ -140,23 +154,24 @@ def convert_time(args, now):
             t = datetime.timedelta(**{timeinc[unit]: other})
 
             if op == "+":
-                if not d[lvl][0] or t > d[lvl][0]:
+                if d[lvl][0] is None or (t is not None and d[lvl][0] is not None and t > d[lvl][0]):  # type: ignore
                     d[lvl][0] = t
             elif op == "-":
-                if not d[lvl][0] or t < d[lvl][1]:
+                if d[lvl][1] is None or (t is not None and d[lvl][1] is not None and t < d[lvl][1]):  # type: ignore
                     d[lvl][1] = t
+    result: Dict[str, List[Optional[datetime.datetime]]] = {}
     for key in d:
-        d[key] = [(now - x) if x is not None else None for x in d[key]]
-    return d
+        result[key] = [(now - x) if x is not None else None for x in d[key]]
+    return result
 
 
-def convert_permissions(shell, args):
+def convert_permissions(shell: Any, args: argparse.Namespace) -> Optional[str]:
     d = {"u": list("..."), "g": list("..."), "o": list("...")}
-    perm = None
-    if args.perm:
+    perm_result: Optional[str] = None
+    if args.perm is not None:
         try:
             int(args.perm[0])
-            perm = [shell.syscall.calc_permission_string(args.perm[0])]
+            perm_result = shell.syscall.calc_permission_string(args.perm[0])
         except Exception:
             for permset in ",".join(args.perm).split(","):
                 lvl = permset[0]
@@ -164,21 +179,24 @@ def convert_permissions(shell, args):
                 perm = permset[2:]
 
                 if op == "=":
-                    d[lvl] = [x if x in perm else "-" for x in "rwx"]
+                    d[lvl] = [
+                        x if perm is not None and x in perm else "-"
+                        for x in "rwx"
+                    ]
                 elif op == "-":
                     d[lvl] = [
-                        "-" if x in perm else d[lvl][i]
+                        "-" if perm is not None and x in perm else d[lvl][i]
                         for i, x in enumerate("rwx")
                     ]
                 elif op == "+":
                     d[lvl] = [
-                        x if x in perm else d[lvl][i]
+                        x if perm is not None and x in perm else d[lvl][i]
                         for i, x in enumerate("rwx")
                     ]
-            perm = "".join(["".join(d[key]) for key in "ugo"])
+            perm_result = "".join(["".join(d[key]) for key in "ugo"])
 
-    return perm
+    return perm_result
 
 
-def help():
+def help() -> str:
     return parser.help_msg()

@@ -1,4 +1,6 @@
 import re
+import argparse
+from typing import Any, List, Pattern
 
 from kernel.utils import Parser
 from kernel.common import resolve_path, handle_file_operation
@@ -18,27 +20,27 @@ pa("-i", action="store_true", dest="ignorecase", default=False)
 pa("-v", action="store_true", dest="invert", default=False)
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if args.paths:
+        if parsed_args.paths:
             skip = 0
             # re.IGNORECASE is a number
-            case = args.ignorecase * re.IGNORECASE
-            if not args.pattern:
-                pattern = re.compile(args.paths[0], case)
+            case = parsed_args.ignorecase * re.IGNORECASE
+            if not parsed_args.pattern:
+                pattern: Pattern[str] = re.compile(parsed_args.paths[0], case)
                 skip = 1
             else:
-                pattern = re.compile(args.pattern, case)
+                pattern = re.compile(parsed_args.pattern, case)
 
-            for path in sorted(args.paths[skip:]):
-                grep(shell, args, pattern, path)
+            for path in sorted(parsed_args.paths[skip:]):
+                grep(shell, parsed_args, pattern, path)
 
             if shell.stdin:
                 for line in shell.stdin.read():
                     # use xor to invert the selection
-                    if bool(re.findall(pattern, line)) ^ args.invert:
+                    if bool(re.findall(pattern, line)) ^ parsed_args.invert:
                         shell.stdout.write(line.strip())
             if not shell.stdout:
                 shell.stdout.write("")
@@ -46,7 +48,9 @@ def run(shell, args):
             shell.stderr.write("missing file operand")
 
 
-def grep(shell, args, pattern, path):
+def grep(
+    shell: Any, args: argparse.Namespace, pattern: Pattern[str], path: str
+) -> None:
     newpath = resolve_path(shell, path)
     if handle_file_operation(shell, newpath, "is_file"):
         lines = read_file_lines(shell, newpath)
@@ -61,5 +65,5 @@ def grep(shell, args, pattern, path):
         shell.stderr.write("%s does not exist" % (newpath,))
 
 
-def help():
+def help() -> str:
     return parser.help_msg()

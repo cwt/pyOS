@@ -1,3 +1,4 @@
+from typing import Any, List
 from kernel.utils import Parser
 
 desc = "Returns the command history."
@@ -10,7 +11,7 @@ pa(
 )
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
     args = parser.parse_args(args)
     if not parser.help:
@@ -24,5 +25,5 @@ def run(shell, args):
             shell.stdout.write(msg)
 
 
-def help():
+def help() -> str:
     return parser.help_msg()

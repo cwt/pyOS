@@ -9,7 +9,7 @@ def run(shell: Any, args: List[str]) -> None:
     if args:
         path = resolve_path(shell, args[0])
         if handle_file_operation(shell, path, "is_dir"):
-            shell.set_path(path)
+            shell.path = path
         else:
             write_error(shell, "%s: no such directory" % (path,))
 

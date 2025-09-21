@@ -2,14 +2,14 @@
 Common file operation utilities for pyOS programs.
 """
 
-from typing import Any, List, Callable
+from typing import Any, List, Callable, Optional
 
 
 def process_files_with_callback(
     shell: Any,
     paths: List[str],
-    file_callback: Callable,
-    dir_callback: Callable = None,
+    file_callback: Callable[[str], None],
+    dir_callback: Optional[Callable[[str], None]] = None,
     recursive: bool = False,
 ) -> None:
     """

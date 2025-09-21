@@ -1,4 +1,7 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     if args:
         for x in shell.program_paths(args[0]):
             program = shell.syscall.open_program(x)
@@ -7,7 +10,7 @@ def run(shell, args):
                 break
 
 
-def help():
+def help() -> str:
     a = """
     Which
 

@@ -1,4 +1,6 @@
 import re
+import argparse
+from typing import Any, List, Tuple, Union
 
 from kernel.utils import Parser
 
@@ -21,20 +23,20 @@ pa("-n", action="store_true", dest="silent", default=False)
 subparse = re.compile(r"""(s)(?P<lim>.)(.*?)(?P=lim)(.*?)(?P=lim)(.*)""")
 
 
-def run(shell, args):
+def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if args.paths:
-            for path in args.paths:
-                sed(shell, args, path)
+        if parsed_args.paths:
+            for path in parsed_args.paths:
+                sed(shell, parsed_args, path)
             if not shell.stdout:
                 shell.stdout.write("")
         else:
             shell.stderr.write("no stream")
 
 
-def sed(shell, args, path):
+def sed(shell: Any, args: argparse.Namespace, path: str) -> None:
     newpath = shell.sabs_path(path)
     if shell.syscall.is_file(newpath):
         if args.inplace:
@@ -53,8 +55,12 @@ def sed(shell, args, path):
                     isinstance(address[-1], str)
                 )
                 address = [lenfile if x == "$" else x for x in address]
-                if address[-1].startswith("+"):
-                    address[-1] = address[0] + int(address[-1][1:])
+                if (
+                    len(address) > 0
+                    and isinstance(address[-1], str)
+                    and address[-1].startswith("+")
+                ):
+                    address[-1] = address[0] + int(address[-1][1:])  # type: ignore
                 if all(isinstance(x, int) for x in address):
                     address[-1] = max(address)
                 start = False
@@ -92,7 +98,7 @@ def sed(shell, args, path):
         shell.stderr.write("%s does not exist" % (newpath,))
 
 
-def match(i, line, address):
+def match(i: int, line: str, address: Union[int, str]) -> bool:
     if isinstance(address, int):
         val = i >= address
     else:
@@ -100,7 +106,7 @@ def match(i, line, address):
     return val
 
 
-def edit_line(line, expression):
+def edit_line(line: str, expression: str) -> str:
     try:
         command, sep, regex, repl, flags = re.findall(subparse, expression)[0]
         if command == "s":
@@ -118,7 +124,7 @@ def edit_line(line, expression):
     return newline
 
 
-def parse_expression(expression):
+def parse_expression(expression: str) -> Tuple[List[Union[int, str]], str]:
     commands = "qdpnsy!"
     split = re.split("""((?<!\\\\)/.*(?<!\\\\)/)""", expression)
     idx = None
@@ -142,21 +148,25 @@ def parse_expression(expression):
         else:
             cmdstr += letter
 
-    address = addrstr.split(",")
+    address: List[Union[int, str]] = addrstr.split(",")
     # clean address values
     for i, value in enumerate(address):
-        if not value.startswith("+"):
+        if isinstance(value, str) and not value.startswith("+"):
             try:
                 address[i] = int(value) - 1
             except Exception:
                 # remove the slashes
-                if value.startswith("/") and address.endswith("/"):
+                if (
+                    isinstance(value, str)
+                    and value.startswith("/")
+                    and value.endswith("/")
+                ):
                     address[i] = value[1:-1]
     command = cmdstr
     return address, command
 
 
-def help():
+def help() -> str:
     return parser.help_msg()
 
 

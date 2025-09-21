@@ -1,4 +1,7 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     if len(args) >= 1:
         name = args[0]
         for x in shell.program_paths(name):
@@ -12,7 +15,7 @@ def run(shell, args):
         shell.stdout.write(help())
 
 
-def help():
+def help() -> str:
     a = """
     Help
 

@@ -1,4 +1,7 @@
-def run(shell, args):
+from typing import Any, List
+
+
+def run(shell: Any, args: List[str]) -> None:
     if args:
         path = shell.sabs_path(args[0])
         if shell.syscall.exists(path):
@@ -12,7 +15,7 @@ def run(shell, args):
         shell.stderr.write("missing file operand")
 
 
-def help():
+def help() -> str:
     a = """
     Etanetacnoc (Reverse Concatenate)
 

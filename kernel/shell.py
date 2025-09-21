@@ -1,9 +1,13 @@
 import threading
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Dict, TYPE_CHECKING
 
 import kernel.stream
 import kernel.system
 from kernel.constants import PROGRAMSDIR, VARCHAR, BASEDIR
+from kernel.exceptions import CommandNotFoundError
+
+if TYPE_CHECKING:
+    from kernel.system import System
 
 
 class Shell(threading.Thread):
@@ -12,31 +16,35 @@ class Shell(threading.Thread):
         pid: int,
         parent: Optional["Shell"] = None,
         program: str = "interpreter",
-        args: str = "",
-        stdin: Any = None,
+        args: Optional[List[str]] = None,
+        stdin: Optional[Any] = None,
         path: str = BASEDIR,
+        system_instance: Optional["System"] = None,
     ) -> None:
         super(Shell, self).__init__()
         self.programname = program
-        self.args = args
+        self.args: List[str] = args or []
 
-        self.__path = path
-        self.__oldpath = path
+        self._path = path
+        self._oldpath = path
         self.parent = parent
         self.pid = pid
+        self.system: kernel.system.System = (
+            system_instance or kernel.system.System()
+        )
 
-        self.syscall = kernel.system.SysCall(self)
+        self.syscall = kernel.system.SysCall(self, self.system)
 
         if self.parent:
-            self.vars = self.parent.vars.copy()
-            self.aliases = self.parent.aliases.copy()
-            self.prevcommands = self.parent.prevcommands[:]
+            self.vars: Dict[str, str] = self.parent.vars.copy()
+            self.aliases: Dict[str, str] = self.parent.aliases.copy()
+            self.prevcommands: List[str] = self.parent.prevcommands[:]
         else:
             self.vars = {
                 "PATH": PROGRAMSDIR,
                 "HOME": BASEDIR,
-                "PWD": self.__path,
-                "OLDPWD": self.__oldpath,
+                "PWD": self._path,
+                "OLDPWD": self._oldpath,
             }
             self.aliases = dict()
             self.prevcommands = []
@@ -46,37 +54,44 @@ class Shell(threading.Thread):
         self.stderr = kernel.stream.Pipe(name="err", writer=self)
 
     def run(self) -> None:
-        self.program = self.find_program(self.programname)
-        if self.program:
-            self.program.run(self, self.args)
-        else:
+        try:
+            self.program = self.find_program(self.programname)
+            if self.program:
+                self.program.run(self, self.args)
+        except CommandNotFoundError:
             # TODO # add back "is a directory"
             self.stderr.write("%s: command not found\n" % (self.programname,))
         # cleanup
         self.stdout.close()
         self.stderr.close()
-        kernel.system.System.kill(self)
+        self.system.kill(self)
 
-    def get_path(self) -> str:
-        return self.__path
+    @property
+    def path(self) -> str:
+        """Get the current path."""
+        return self._path
 
-    def set_path(self, path: str) -> None:
-        self.__oldpath = self.__path
-        self.__path = self.sabs_path(path)
+    @path.setter
+    def path(self, value: str) -> None:
+        """Set the current path."""
+        self._oldpath = self._path
+        self._path = self.sabs_path(value)
 
-    def get_old_path(self) -> str:
-        return self.__oldpath
+    @property
+    def old_path(self) -> str:
+        """Get the previous path."""
+        return self._oldpath
 
     def sabs_path(self, path: str) -> str:
         if not path.startswith("/"):
             if path.startswith("./"):
                 path = path[path.index("/") + 1 :]
-            path = self.syscall.join_path(self.get_path(), path)
+            path = self.syscall.join_path(self.path, path)
         return self.syscall.iabs_path(path)
 
     def srel_path(self, path: str, base: Optional[str] = None) -> str:
         if base is None:
-            base = self.get_path()
+            base = self.path
         return self.syscall.rel_path(self.sabs_path(path), self.sabs_path(base))
 
     def program_paths(self, name: str) -> List[str]:
@@ -89,9 +104,14 @@ class Shell(threading.Thread):
 
     def get_var(self, name: str) -> str:
         try:
-            x = self.vars[name.group(0).lstrip(VARCHAR)]
-        except AttributeError:
-            x = self.vars[name.lstrip(VARCHAR)]
+            # Handle regex match objects
+            if hasattr(name, "group"):
+                x = self.vars[name.group(0).lstrip(VARCHAR)]
+            else:
+                # Handle regular strings
+                x = self.vars[name.lstrip(VARCHAR)]
+        except KeyError:
+            x = ""
         except Exception:
             x = ""
         return x
@@ -128,7 +148,7 @@ class Shell(threading.Thread):
             self.pid,
             self.programname,
             self.args,
-            self.__path,
+            self.path,
         )
 
     def __str__(self) -> str:

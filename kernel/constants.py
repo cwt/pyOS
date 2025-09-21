@@ -1,5 +1,16 @@
 import os
-from typing import Final
+from typing import Final, List
+from enum import IntEnum
+
+
+class SystemState(IntEnum):
+    """Enumeration of system states."""
+
+    REBOOT = -2
+    SHUTDOWN = -1
+    IDLE = 0
+    RUNNING = 1
+
 
 OSNAME: Final[str] = "pyOS"
 
@@ -18,7 +29,7 @@ SYSDATADIR: Final[str] = "/data"
 
 # Standard file paths
 METADATAFILE: Final[str] = os.path.join(BASEPATH, "data/data")
-USERDATAFILE: Final[str] = METADATAFILE
+USERDATAFILE: Final[str] = os.path.join(BASEPATH, "data/userdata")
 
 # Special Characters/strings
 VARCHAR: Final[str] = "$"
@@ -35,4 +46,4 @@ IDLE: Final[int] = 0
 RUNNING: Final[int] = 1
 
 # Development Vars
-IGNORREFILES: Final[list[str]] = [".pyc", ".git"]
+IGNORREFILES: Final[List[str]] = [".pyc", ".git"]

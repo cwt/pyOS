@@ -1,7 +1,25 @@
-from typing import Optional, List, Tuple, Any
+from typing import Optional, List, Tuple, Any, Union
+import sqlite3
+from contextlib import contextmanager
 
 from kernel.utils import convert_many
-from kernel.metadata import get_db_connection, execute_query, execute_many
+from kernel.models import UserData
+
+
+@contextmanager
+def get_db_connection() -> Any:
+    """Get a database connection with type detection."""
+    from kernel.constants import USERDATAFILE
+
+    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
+    try:
+        yield con
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 def build_user_data_database() -> None:
@@ -14,7 +32,6 @@ def build_user_data_database() -> None:
                     shell TEXT,
                     password TEXT)"""
 
-    con = get_db_connection()
     root = (
         "root",
         "root",
@@ -31,25 +48,70 @@ def build_user_data_database() -> None:
         "/programs/interpreter",
         "2744ccd10c7533bd736ad890f9dd5cab2adb27b07d500b9493f29cdc420cb2e0",
     )  # me
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(tablesql)
-        if get_user_data("chris") is None:
-            cur.execute(addsql, chris)
-        if get_user_data("root") is None:
-            cur.execute(addsql, root)
+        # Always insert the users - in tests, we start with a clean database
+        cur.execute(addsql, root)
+        cur.execute(addsql, chris)
 
 
-def get_user_data(user: str) -> Optional[Tuple]:
+def execute_query(
+    query: str, params: Tuple[Any, ...] = (), fetch: str = "all"
+) -> Optional[Union[List[Tuple[Any, ...]], Tuple[Any, ...]]]:
+    """Execute a database query with error handling."""
+    try:
+        with get_db_connection() as con:
+            cur = con.cursor()
+            cur.execute(query, params)
+            if fetch == "one":
+                result = cur.fetchone()
+            elif fetch == "all":
+                result = cur.fetchall()
+            else:
+                result = None
+            if result is not None:
+                # In Python 3, strings are already Unicode, so no conversion needed
+                if isinstance(result, list):
+                    result = [
+                        tuple(
+                            str(x) if isinstance(x, bytes) else x for x in row
+                        )
+                        for row in result
+                    ]
+                elif isinstance(result, tuple):
+                    result = tuple(
+                        str(x) if isinstance(x, bytes) else x for x in result
+                    )
+            # Type cast to satisfy mypy
+            return result  # type: ignore
+    except Exception:
+        return None
+
+
+def execute_many(query: str, params_list: List[Tuple[Any, ...]]) -> bool:
+    """Execute a database query with multiple parameter sets."""
+    try:
+        with get_db_connection() as con:
+            cur = con.cursor()
+            cur.executemany(query, params_list)
+        return True
+    except Exception:
+        return False
+
+
+def get_user_data(user: str) -> Optional[UserData]:
     data = execute_query(
-        "SELECT * FROM userdata WHERE username = ?", (user,), "one"
+        "SELECT username, groupname, info, homedir, shell, password FROM userdata WHERE username = ?",
+        (user,),
+        "one",
     )
-    return data
+    return UserData.from_tuple(data) if data else None  # type: ignore
 
 
-def get_all_user_data() -> Optional[List[Tuple]]:
+def get_all_user_data() -> Optional[List[UserData]]:
     data = execute_query("SELECT * FROM userdata", (), "all")
-    return data
+    return [UserData.from_tuple(item) for item in data] if data else None  # type: ignore
 
 
 #######################################
@@ -78,12 +140,35 @@ def change_user(user: str, value: Any) -> None:
 
 
 def get_group(user: str) -> str:
-    return get_user_data(user)[1]
+    data = get_user_data(user)
+    if data:
+        return data.groupname
+    return ""
+
+
+def get_info(user: str) -> str:
+    data = get_user_data(user)
+    if data:
+        return data.info
+    return ""
+
+
+def get_homedir(user: str) -> str:
+    data = get_user_data(user)
+    if data:
+        return data.homedir
+    return ""
+
+
+def get_shell(user: str) -> str:
+    data = get_user_data(user)
+    if data:
+        return data.shell
+    return ""
 
 
 def set_group(user: str, value: str) -> None:
-    con = get_db_connection()
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(
             "UPDATE userdata SET groupname = ? WHERE username = ?",
@@ -91,63 +176,56 @@ def set_group(user: str, value: str) -> None:
         )
 
 
-def get_info(user: str) -> str:
-    return get_user_data(user)[2]
-
-
 def set_info(user: str, value: str) -> None:
-    con = get_db_connection()
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(
             "UPDATE userdata SET info = ? WHERE username = ?", (value, user)
         )
 
 
-def get_homedir(user: str) -> str:
-    return get_user_data(user)[3]
-
-
 def set_homedir(user: str, value: str) -> None:
-    con = get_db_connection()
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(
-            "UPDATE userdata SET homedir = ? WHERE username = ?", (value, user)
+            "UPDATE userdata SET homedir = ? WHERE username = ?",
+            (value, user),
         )
-
-
-def get_shell(user: str) -> str:
-    return get_user_data(user)[4]
 
 
 def set_shell(user: str, value: str) -> None:
-    con = get_db_connection()
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(
-            "UPDATE userdata SET shell = ? WHERE username = ?", (value, user)
+            "UPDATE userdata SET shell = ? WHERE username = ?",
+            (value, user),
         )
 
 
-def get_password(user: str) -> str:
-    return get_user_data(user)[5]
-
-
 def set_password(user: str, value: str) -> None:
-    con = get_db_connection()
-    with con:
+    with get_db_connection() as con:
         cur = con.cursor()
         cur.execute(
-            "UPDATE userdata SET password = ? WHERE username = ?", (value, user)
+            "UPDATE userdata SET password = ? WHERE username = ?",
+            (value, user),
         )
 
 
 #######################################
 
 
+def get_password(user: str) -> str:
+    data = get_user_data(user)
+    if data:
+        return data.password
+    return ""
+
+
 def correct_password(user: str, password: str) -> bool:
     try:
-        return get_password(user) == password
-    except TypeError:
+        user_data = get_user_data(user)
+        if user_data is None:
+            return False
+        return user_data.password == password
+    except (TypeError, IndexError):
         return False

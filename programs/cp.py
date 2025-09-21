@@ -1,3 +1,4 @@
+import argparse
 from kernel.utils import Parser
 from typing import Any, List
 from kernel.common import (
@@ -22,31 +23,31 @@ pa("-v", action="store_true", dest="verbose", default=False)
 
 def run(shell: Any, args: List[str]) -> None:
     parser.add_shell(shell)
-    args = parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
     if not parser.help:
-        if len(args.paths) >= 2:
-            dest = resolve_path(shell, args.paths[-1])
+        if len(parsed_args.paths) >= 2:
+            dest = resolve_path(shell, parsed_args.paths[-1])
             if (
                 handle_file_operation(shell, dest, "is_dir")
-                or len(args.paths) == 2
+                or len(parsed_args.paths) == 2
                 or not handle_file_operation(shell, dest, "exists")
             ):
-                for src in args.paths[:-1]:
-                    copy(shell, args, src, dest)
+                for src in parsed_args.paths[:-1]:
+                    copy(shell, parsed_args, src, dest)
             else:
                 shell.stderr.write("%s is not a directory" % dest)
         else:
             shell.stderr.write("missing file operand")
 
 
-def copy(shell: Any, args: Any, src: str, dest: str) -> None:
+def copy(shell: Any, args: argparse.Namespace, src: str, dest: str) -> None:
     src = resolve_path(shell, src)
 
     if args.recursive and handle_file_operation(shell, src, "is_dir"):
         # This would need to be implemented in the common module if used frequently
         srcpaths = []
 
-        def collect_paths(current_path):
+        def collect_paths(current_path: str) -> None:
             srcpaths.append(current_path)
             if handle_file_operation(shell, current_path, "is_dir"):
                 for item in shell.syscall.list_dir(current_path):
