@@ -1,6 +1,5 @@
 *.pyc
 data/*data
-test_*
 @*
 .coverage
 *.egg-info
