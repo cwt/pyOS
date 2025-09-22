@@ -33,6 +33,9 @@ class TestLsProgram:
             "modified",
         )
         mock_shell.syscall.exists.return_value = True
+        mock_shell.syscall.is_file.return_value = (
+            False  # Path is a directory, not a file
+        )
 
         ls_program.run(mock_shell, [])
 
@@ -52,6 +55,9 @@ class TestLsProgram:
             "modified",
         )
         mock_shell.syscall.exists.return_value = True
+        mock_shell.syscall.is_file.return_value = (
+            False  # Paths are directories, not files
+        )
 
         # Mock the resolve_path function
         with patch(

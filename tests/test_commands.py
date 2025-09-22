@@ -177,6 +177,39 @@ class CommandTester:
             print(f"  ERROR: ls -l failed with exception. Stderr: {stderr}")
             return False
 
+    def test_ls_file(self) -> bool:
+        """Test ls -l with a specific file."""
+        print("Testing ls -l with a specific file...")
+
+        # Create a test file
+        test_file = "test_ls_file.txt"
+        test_file_path = os.path.join(self.temp_dir, test_file)
+        with open(test_file_path, "w") as f:
+            f.write("test content")
+
+        # Add metadata for the test file
+        import datetime
+
+        now = datetime.datetime.now()
+        with sqlite3.connect(self.test_metadata_db) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT OR REPLACE INTO metadata VALUES (?, ?, ?, ?, ?, ?)",
+                (f"/{test_file}", "root", "rw-rw-rw-", now, now, now),
+            )
+            conn.commit()
+
+        # Test ls -l with the specific file
+        stdout, stderr = self.run_command("ls", ["-l", test_file])
+
+        # Should not crash with exception
+        if stderr and "exception" in str(stderr).lower():
+            print(f"  ERROR: {stderr}")
+            return False
+        else:
+            print("  SUCCESS: ls -l with specific file works")
+            return True
+
     def test_pwd(self) -> bool:
         """Test pwd command."""
         print("Testing pwd command...")
@@ -311,6 +344,29 @@ class CommandTester:
             print("  SUCCESS: mv runs without crashing")
             return True
 
+    def test_edit(self) -> bool:
+        """Test edit command."""
+        print("Testing edit command...")
+
+        # Create a test file
+        test_file = "test_edit.txt"
+        test_content = ["Line 1\n", "Line 2\n", "Line 3\n"]
+
+        # Write test content to file
+        with open(os.path.join(self.temp_dir, test_file), "w") as f:
+            f.writelines(test_content)
+
+        # Test running edit command on the file
+        stdout, stderr = self.run_command("edit", [test_file])
+
+        # Should not crash with exception
+        if stderr and "exception" in str(stderr).lower():
+            print(f"  ERROR: {stderr}")
+            return False
+        else:
+            print("  SUCCESS: edit runs without crashing")
+            return True
+
     def test_help(self) -> bool:
         """Test help command."""
         print("Testing help command...")
@@ -346,6 +402,7 @@ class CommandTester:
         tests = [
             self.test_ls,
             self.test_ls_long,
+            self.test_ls_file,
             self.test_pwd,
             self.test_touch,
             self.test_mkdir,
@@ -356,6 +413,7 @@ class CommandTester:
             self.test_mv,
             self.test_help,
             self.test_which,
+            self.test_edit,
         ]
 
         results = {}
