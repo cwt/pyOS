@@ -6,20 +6,62 @@ from kernel.utils import convert_many
 from kernel.models import UserData
 
 
+# For testing with in-memory databases, we need to maintain a single connection
+_test_userdata_connection = None
+
+
+def _get_test_connection() -> sqlite3.Connection:
+    """Get or create a test connection for in-memory databases."""
+    global _test_userdata_connection
+    from kernel.constants import USERDATAFILE
+
+    if _test_userdata_connection is None:
+        _test_userdata_connection = sqlite3.connect(
+            USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES
+        )
+        # Create the userdata table
+        cur = _test_userdata_connection.cursor()
+        cur.execute(
+            """CREATE TABLE IF NOT EXISTS userdata (
+                            username TEXT,
+                            groupname TEXT,
+                            info TEXT,
+                            homedir TEXT,
+                            shell TEXT,
+                            password TEXT)"""
+        )
+    return _test_userdata_connection
+
+
 @contextmanager
 def get_db_connection() -> Any:
     """Get a database connection with type detection."""
     from kernel.constants import USERDATAFILE
 
-    con = sqlite3.connect(USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    try:
-        yield con
-        con.commit()
-    except Exception:
-        con.rollback()
-        raise
-    finally:
-        con.close()
+    # For in-memory databases during testing, use a single connection
+    is_memory_db = USERDATAFILE == ":memory:"
+
+    if is_memory_db:
+        con = _get_test_connection()
+        try:
+            yield con
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        # Don't close the connection for in-memory databases during testing
+    else:
+        con = sqlite3.connect(
+            USERDATAFILE, detect_types=sqlite3.PARSE_DECLTYPES
+        )
+        try:
+            yield con
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
 
 
 def build_user_data_database() -> None:

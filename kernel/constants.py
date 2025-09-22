@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import Final, List
 from enum import IntEnum
 
@@ -27,9 +28,16 @@ METADIR: Final[str] = "/meta"  # need to implement
 USERDIR: Final[str] = "/user"  # need to implement
 SYSDATADIR: Final[str] = "/data"
 
-# Standard file paths
-METADATAFILE: Final[str] = os.path.join(BASEPATH, "data/data")
-USERDATAFILE: Final[str] = os.path.join(BASEPATH, "data/userdata")
+# Check if we're running tests
+_is_running_tests = "pytest" in sys.modules or "unittest" in sys.modules
+
+# Standard file paths - use in-memory database for tests
+if _is_running_tests:
+    METADATAFILE = ":memory:"
+    USERDATAFILE = ":memory:"
+else:
+    METADATAFILE = os.path.join(BASEPATH, "data/data")
+    USERDATAFILE = os.path.join(BASEPATH, "data/userdata")
 
 # Special Characters/strings
 VARCHAR: Final[str] = "$"

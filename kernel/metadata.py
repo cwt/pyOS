@@ -26,18 +26,58 @@ sqlite3.register_converter("timestamp", convert_datetime)
 sqlite3.register_converter("TIMESTAMP", convert_datetime)
 
 
+# For testing with in-memory databases, we need to maintain a single connection
+_test_metadata_connection = None
+
+
+def _get_test_connection() -> sqlite3.Connection:
+    """Get or create a test connection for in-memory databases."""
+    global _test_metadata_connection
+    if _test_metadata_connection is None:
+        _test_metadata_connection = sqlite3.connect(
+            METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES
+        )
+        # Create the metadata table
+        cur = _test_metadata_connection.cursor()
+        cur.execute(
+            """CREATE TABLE IF NOT EXISTS metadata (
+                            path TEXT,
+                            owner TEXT,
+                            permission TEXT,
+                            created TIMESTAMP,
+                            accessed TIMESTAMP,
+                            modified TIMESTAMP)"""
+        )
+    return _test_metadata_connection
+
+
 @contextmanager
 def get_db_connection() -> Any:
     """Context manager for database connections."""
-    con = sqlite3.connect(METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES)
-    try:
-        yield con
-        con.commit()
-    except Exception:
-        con.rollback()
-        raise
-    finally:
-        con.close()
+    # For in-memory databases during testing, use a single connection
+    is_memory_db = METADATAFILE == ":memory:"
+
+    if is_memory_db:
+        con = _get_test_connection()
+        try:
+            yield con
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        # Don't close the connection for in-memory databases during testing
+    else:
+        con = sqlite3.connect(
+            METADATAFILE, detect_types=sqlite3.PARSE_DECLTYPES
+        )
+        try:
+            yield con
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
 
 
 def execute_query(
