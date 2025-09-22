@@ -1,18 +1,14 @@
 import os
 import sys
 import pytest
-import warnings
-from typing import Generator, Tuple
+from typing import Generator, Tuple, Any
 
 # Add the project root to the path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Filter out all ResourceWarnings during testing
-warnings.filterwarnings("ignore", category=ResourceWarning)
-
 
 @pytest.fixture
-def clean_database() -> Generator[Tuple[str, str], None, None]:
+def clean_database(request: Any) -> Generator[Tuple[str, str], None, None]:
     """Provide a clean in-memory database for each test."""
     # With the new in-memory database approach, we just need to return the
     # in-memory database identifiers
@@ -23,7 +19,13 @@ def clean_database() -> Generator[Tuple[str, str], None, None]:
     import kernel.metadata
     import kernel.userdata
 
+    # Close any existing connections and reset the singletons
+    if kernel.metadata._test_metadata_connection:
+        kernel.metadata._test_metadata_connection.close()
     kernel.metadata._test_metadata_connection = None
+
+    if kernel.userdata._test_userdata_connection:
+        kernel.userdata._test_userdata_connection.close()
     kernel.userdata._test_userdata_connection = None
 
     # Initialize metadata database
@@ -76,11 +78,20 @@ def clean_database() -> Generator[Tuple[str, str], None, None]:
         cur.execute("INSERT INTO userdata VALUES (?, ?, ?, ?, ?, ?)", root)
         cur.execute("INSERT INTO userdata VALUES (?, ?, ?, ?, ?, ?)", chris)
 
-    yield metadata_db, userdata_db
+    def close_connections() -> None:
+        # Close connections after test to avoid ResourceWarnings
+        if kernel.metadata._test_metadata_connection:
+            kernel.metadata._test_metadata_connection.close()
+        if kernel.userdata._test_userdata_connection:
+            kernel.userdata._test_userdata_connection.close()
 
-    # Reset connections after test
-    kernel.metadata._test_metadata_connection = None
-    kernel.userdata._test_userdata_connection = None
+        # Reset connections after test
+        kernel.metadata._test_metadata_connection = None
+        kernel.userdata._test_userdata_connection = None
+
+    request.addfinalizer(close_connections)
+
+    yield metadata_db, userdata_db
 
 
 @pytest.fixture(autouse=True)
