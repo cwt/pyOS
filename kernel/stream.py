@@ -84,15 +84,12 @@ class Pipe:
                 # DEBUG: Print what we're working with
                 # print(f"DEBUG broadcast: filtered_values = {filtered_values}, len = {len(filtered_values)}")
                 if len(filtered_values) == 1:
-                    # Single line output
-                    logger.info("<%s> %s", self.name, filtered_values[0])
+                    # Single line output - add newline for consistency
+                    logger.info("<%s>\n%s", self.name, filtered_values[0])
                 else:
-                    # Multi-line output with indentation
-                    indented_content = "\n".join(
-                        f"  {line}" for line in filtered_values
-                    )
-                    # print(f"DEBUG broadcast: logging multi-line: {indented_content}")
-                    logger.info("<%s>\n%s", self.name, indented_content)
+                    # Multi-line output without indentation for consistency
+                    content = "\n".join(filtered_values)
+                    logger.info("<%s>\n%s", self.name, content)
 
     def __repr__(self) -> str:
         writer_pid = getattr(self.writer, "pid", "None")
