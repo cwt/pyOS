@@ -29,6 +29,11 @@ def run(shell: Any, args: List[str]) -> None:
             # Handle Ctrl+D gracefully by exiting the interpreter
             print()  # Print a newline for clean exit
             break
+        except KeyboardInterrupt:
+            # Handle Ctrl+C gracefully at the prompt
+            print()  # Print a newline
+            print("Use 'shutdown' to exit pyOS, or Ctrl+D to logout")
+            continue
         data = data.strip()
         if data:
             cleaned, command = shell_expansion(shell, data)
