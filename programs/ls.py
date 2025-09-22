@@ -39,63 +39,95 @@ class LsCommand(BaseCommand):
         path = resolve_path(shell, relpath)
         if handle_file_operation(shell, path, "exists"):
             try:
-                a = shell.syscall.list_dir(path)
-                if args.long:
-                    b = [
-                        fsgm(
-                            resolve_path(
-                                shell, shell.syscall.join_path(path, x)
+                # Check if the path is a file or directory
+                if handle_file_operation(shell, path, "is_file"):
+                    # Handle single file case
+                    metadata = fsgm(path)
+                    if args.long and metadata is not None:
+                        # Handle both FileMetadata objects and tuples for backward compatibility
+                        if isinstance(metadata, FileMetadata):
+                            # FileMetadata object
+                            permission = metadata.permission
+                            owner = metadata.owner
+                            item_path = metadata.path
+                        else:
+                            # Tuple (from tests)
+                            permission, owner, item_path = (
+                                metadata[2],
+                                metadata[1],
+                                metadata[0],
                             )
+                        output_line = format_str % (
+                            permission,
+                            owner,
+                            "1",
+                            fsbn(item_path),
                         )
-                        for x in a
-                    ]
-                    # Access attributes from FileMetadata objects or tuples, filtering out None values
-                    a = []
-                    for item in b:
-                        if item is not None:
-                            # Handle both FileMetadata objects and tuples for backward compatibility
-                            if isinstance(item, FileMetadata):
-                                # FileMetadata object
-                                permission = item.permission
-                                owner = item.owner
-                                item_path = item.path
-                            else:
-                                # Tuple (from tests)
-                                permission, owner, item_path = (
-                                    item[2],
-                                    item[1],
-                                    item[0],
-                                )
-                            a.append(
-                                format_str
-                                % (permission, owner, "1", fsbn(item_path))
-                            )
-
-                if len(args.paths) > 1:
-                    shell.stdout.write("%s:" % (relpath,))
-                if shell.stdout or args.long:
-                    shell.stdout.write("\n".join(a))
+                        shell.stdout.write(output_line)
+                    else:
+                        # Just print the filename for non-long format
+                        shell.stdout.write(fsbn(path))
                 else:
-                    if a:
-                        maxlen = max(max([len(x) for x in a]), 1)
-                        # arbitrary line length
-                        columns = (80 // maxlen) - 1
-                        b = []
-                        for i, x in enumerate(a):
-                            newline = "\n" if not ((i + 1) % columns) else ""
-                            if not ((i + 1) % columns):
-                                newline = "\n"
-                                spacing = ""
-                            else:
-                                newline = ""
-                                spacing = " " * (maxlen - len(x) + 1)
-                            b.append(x + spacing + newline)
-                        output = "".join(b).rstrip()
-                        shell.stdout.write(output)
-                        if output:  # Only add newline if there was output
-                            shell.stdout.write("\n")
-                if len(args.paths) > 1:
-                    shell.stdout.write("\n")
+                    # Handle directory case (existing logic)
+                    a = shell.syscall.list_dir(path)
+                    if args.long:
+                        b = [
+                            fsgm(
+                                resolve_path(
+                                    shell, shell.syscall.join_path(path, x)
+                                )
+                            )
+                            for x in a
+                        ]
+                        # Access attributes from FileMetadata objects or tuples, filtering out None values
+                        a = []
+                        for item in b:
+                            if item is not None:
+                                # Handle both FileMetadata objects and tuples for backward compatibility
+                                if isinstance(item, FileMetadata):
+                                    # FileMetadata object
+                                    permission = item.permission
+                                    owner = item.owner
+                                    item_path = item.path
+                                else:
+                                    # Tuple (from tests)
+                                    permission, owner, item_path = (
+                                        item[2],
+                                        item[1],
+                                        item[0],
+                                    )
+                                a.append(
+                                    format_str
+                                    % (permission, owner, "1", fsbn(item_path))
+                                )
+
+                    if len(args.paths) > 1:
+                        shell.stdout.write("%s:" % (relpath,))
+                    if shell.stdout or args.long:
+                        shell.stdout.write("\n".join(a))
+                    else:
+                        if a:
+                            maxlen = max(max([len(x) for x in a]), 1)
+                            # arbitrary line length
+                            columns = (80 // maxlen) - 1
+                            b = []
+                            for i, x in enumerate(a):
+                                newline = (
+                                    "\n" if not ((i + 1) % columns) else ""
+                                )
+                                if not ((i + 1) % columns):
+                                    newline = "\n"
+                                    spacing = ""
+                                else:
+                                    newline = ""
+                                    spacing = " " * (maxlen - len(x) + 1)
+                                b.append(x + spacing + newline)
+                            output = "".join(b).rstrip()
+                            shell.stdout.write(output)
+                            if output:  # Only add newline if there was output
+                                shell.stdout.write("\n")
+                    if len(args.paths) > 1:
+                        shell.stdout.write("\n")
             except OSError:
                 shell.stderr.write(
                     "ls: cannot acces %s: no such file or directory\n"
